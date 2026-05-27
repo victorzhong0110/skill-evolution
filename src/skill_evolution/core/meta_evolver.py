@@ -18,6 +18,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from rich.console import Console
+from rich.table import Table
 
 from skill_evolution.config import Config
 from skill_evolution.core.changelog import ChangelogEntry, append_changelog
@@ -182,10 +183,8 @@ class MetaSkillEvolver:
         verdict_color = "green" if verdict.passed else "red"
         console.print(f"  Gate: [{verdict_color}]{verdict.summary}[/{verdict_color}]")
 
-        if verdict.improved:
-            console.print(f"    Improved: {', '.join(verdict.improved)}")
-        if verdict.regressed:
-            console.print(f"    Regressed: {', '.join(verdict.regressed)}")
+        if verdict.improved or verdict.regressed:
+            self._print_score_table(baseline_scores, candidate_scores, verdict)
 
         # 6. Accept or rollback
         accepted = verdict.passed and candidate_skill.content_hash != skill.content_hash
@@ -257,6 +256,55 @@ class MetaSkillEvolver:
                 "Compare these trajectories and extract delta signals."
             )
         return f"Execute this test case:\n{case.model_dump_json(indent=2)}"
+
+    @staticmethod
+    def _print_score_table(
+        baseline: dict[str, float],
+        candidate: dict[str, float],
+        verdict: GateVerdict,
+    ) -> None:
+        """Print a Rich table comparing per-case baseline vs candidate scores."""
+        table = Table(title="Score Comparison", show_lines=True)
+        table.add_column("Case", style="bold")
+        table.add_column("Baseline", justify="right")
+        table.add_column("Candidate", justify="right")
+        table.add_column("Delta", justify="right")
+        table.add_column("Status")
+
+        all_keys = sorted(set(baseline) | set(candidate))
+        for key in all_keys:
+            b = baseline.get(key, 0.0)
+            c = candidate.get(key, 0.0)
+            d = c - b
+            if key in verdict.improved:
+                status = "[green]+[/green]"
+                delta_style = "green"
+            elif key in verdict.regressed:
+                status = "[red]-[/red]"
+                delta_style = "red"
+            else:
+                status = "[dim]=[/dim]"
+                delta_style = "dim"
+            table.add_row(
+                key,
+                f"{b:.2f}",
+                f"{c:.2f}",
+                f"[{delta_style}]{d:+.2f}[/{delta_style}]",
+                status,
+            )
+
+        b_mean = _mean(baseline)
+        c_mean = _mean(candidate)
+        d_mean = c_mean - b_mean
+        mean_style = "green" if d_mean > 0 else "red" if d_mean < 0 else "dim"
+        table.add_row(
+            "[bold]Mean[/bold]",
+            f"[bold]{b_mean:.2f}[/bold]",
+            f"[bold]{c_mean:.2f}[/bold]",
+            f"[bold {mean_style}]{d_mean:+.2f}[/bold {mean_style}]",
+            "",
+        )
+        console.print(table)
 
     @staticmethod
     def _generate_placeholder_output(name: str, case: EvalCase) -> str:

@@ -106,6 +106,67 @@ class TestBuildTestPrompt:
         assert "delta signals" in prompt.lower()
 
 
+class TestMetaSkillOutputPath:
+    def test_creates_directory(self, config: Config, workspace: Path):
+        evolver = MetaSkillEvolver(config, workspace=workspace)
+        path = evolver._meta_skill_output_path("strategy_generation")
+        assert path.parent.exists()
+        assert path.name == "strategy_generation.md"
+
+    def test_returns_workspace_path(self, config: Config, workspace: Path):
+        evolver = MetaSkillEvolver(config, workspace=workspace)
+        path = evolver._meta_skill_output_path("test")
+        assert str(workspace) in str(path)
+
+
+class TestGeneratePlaceholder:
+    def test_returns_empty_string(self, config: Config):
+        from skill_evolution.meta_skills.testing.models import EvalCase
+        case = EvalCase(id="t", meta_skill="x", description="d", input_data={}, expected={})
+        result = MetaSkillEvolver._generate_placeholder_output("x", case)
+        assert result == ""
+
+
+class TestPrintScoreTable:
+    def test_runs_without_error(self):
+        from skill_evolution.skill.regression_gate import GateVerdict
+        verdict = GateVerdict(
+            passed=True,
+            improved=["case-1"],
+            regressed=["case-3"],
+            unchanged=["case-2"],
+            summary="test",
+        )
+        MetaSkillEvolver._print_score_table(
+            {"case-1": 0.5, "case-2": 0.7, "case-3": 0.9},
+            {"case-1": 0.8, "case-2": 0.7, "case-3": 0.6},
+            verdict,
+        )
+
+    def test_handles_new_cases(self):
+        from skill_evolution.skill.regression_gate import GateVerdict
+        verdict = GateVerdict(
+            passed=True, new_cases=["case-new"], summary="test",
+        )
+        MetaSkillEvolver._print_score_table(
+            {"case-1": 0.5},
+            {"case-1": 0.5, "case-new": 0.8},
+            verdict,
+        )
+
+
+class TestFallbackPrompt:
+    def test_unknown_meta_skill_prompt(self, config: Config):
+        from skill_evolution.meta_skills.testing.models import EvalCase
+        evolver = MetaSkillEvolver(config)
+        case = EvalCase(
+            id="t", meta_skill="unknown_type", description="d",
+            input_data={"some": "data"}, expected={},
+        )
+        prompt = evolver._build_test_prompt("unknown_type", case)
+        assert "Execute this test case" in prompt
+
+
 class TestMetaEvolveResult:
     def test_dataclass_fields(self):
         from skill_evolution.skill.regression_gate import GateVerdict
@@ -119,3 +180,14 @@ class TestMetaEvolveResult:
         )
         assert result.accepted
         assert result.version == 2
+
+    def test_default_version_is_none(self):
+        from skill_evolution.skill.regression_gate import GateVerdict
+        result = MetaEvolveResult(
+            target="test",
+            accepted=False,
+            baseline_scores={},
+            candidate_scores={},
+            gate_verdict=GateVerdict(passed=False, summary="FAIL"),
+        )
+        assert result.version is None
