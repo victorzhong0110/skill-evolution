@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from skill_evolution.skill.schema import Skill
 
@@ -21,6 +21,7 @@ class VersionEntry(BaseModel):
     evolution_round: int = 0
     file_name: str = ""
     notes: str = ""
+    scores: dict[str, float] = Field(default_factory=dict)
 
 
 class SkillVersionManager:
@@ -59,7 +60,12 @@ class SkillVersionManager:
         data = [e.model_dump(mode="json") for e in entries]
         self.index_path.write_text(json.dumps(data, indent=2, ensure_ascii=False))
 
-    def snapshot(self, skill: Skill, notes: str = "") -> int:
+    def snapshot(
+        self,
+        skill: Skill,
+        notes: str = "",
+        scores: dict[str, float] | None = None,
+    ) -> int:
         """Save a snapshot of the current skill state. Returns new version number."""
         entries = self._load_index()
         new_version = len(entries) + 1
@@ -86,6 +92,7 @@ class SkillVersionManager:
             evolution_round=skill.metadata.evolution_round,
             file_name=file_name,
             notes=notes,
+            scores=scores or {},
         )
         entries.append(entry)
         self._save_index(entries)
@@ -116,6 +123,31 @@ class SkillVersionManager:
     def history(self) -> list[VersionEntry]:
         """Get full version history."""
         return self._load_index()
+
+    def get_scores(self, version: int) -> dict[str, float]:
+        """Get the score map for a specific version."""
+        entries = self._load_index()
+        for entry in entries:
+            if entry.version == version:
+                return dict(entry.scores)
+        return {}
+
+    def get_baseline_scores(self) -> dict[str, float]:
+        """Get scores from the latest version (the current baseline)."""
+        entries = self._load_index()
+        if not entries:
+            return {}
+        return dict(entries[-1].scores)
+
+    def update_scores(self, version: int, scores: dict[str, float]) -> bool:
+        """Update scores for an existing version. Returns True if found."""
+        entries = self._load_index()
+        for entry in entries:
+            if entry.version == version:
+                entry.scores = scores
+                self._save_index(entries)
+                return True
+        return False
 
     def diff_summary(self, v1: int, v2: int) -> dict[str, Any]:
         """Compare two versions at a high level."""
