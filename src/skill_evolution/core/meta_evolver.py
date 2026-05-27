@@ -110,18 +110,29 @@ class MetaSkillEvolver:
 
         This produces output by running the meta-skill text through
         the LLM, then scoring the result structurally.
+
+        Safe to call from both sync and async contexts.
         """
         cases = self._load_test_cases(name, suite_path)
         llm = create_llm(self.config.llm)
 
         def output_fn(case: EvalCase) -> str:
-            return asyncio.run(
-                llm.ask(
-                    prompt=self._build_test_prompt(name, case),
-                    system=skill_text,
-                    temperature=0.5,
-                )
-            ).content
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                loop = None
+
+            coro = llm.ask(
+                prompt=self._build_test_prompt(name, case),
+                system=skill_text,
+                temperature=0.5,
+            )
+            if loop and loop.is_running():
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                    future = pool.submit(asyncio.run, coro)
+                    return future.result(timeout=180).content
+            return asyncio.run(coro).content
 
         suite_result = score_meta_skill(name, cases, output_fn)
         return {r.case_id: r.score for r in suite_result.results}
