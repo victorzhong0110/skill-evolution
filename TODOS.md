@@ -73,3 +73,11 @@ Replaced self-assessment with external TaskEvaluator protocol, fixed {k} placeho
 ### Phase 1: Test Suite Infrastructure (T7a, T7b, T7c)
 
 Added EvalCase/ScoreResult models with JSONL serialization, test suite loader, and structural scoring functions for strategy_generation and trajectory_comparison meta-skills. Each suite has 6 test cases including adversarial and edge cases. Scoring uses deterministic metrics (v1) to avoid evaluation circularity.
+
+### Phase 2: Snapshot + Regression Gate (T8)
+
+Extended SkillVersionManager with per-version score maps. Added RegressionGate (check_regression) that blocks promotion when any test score drops below baseline, with configurable tolerance.
+
+### Phase 3: Evolution Cycle (T9)
+
+MetaSkillEvolver orchestrator with full cycle: snapshot → baseline score → evolve → candidate score → regression gate → accept/rollback. CLI commands: meta-evolve, meta-test, meta-snapshot. Supports --dry-run, --tolerance, custom test suites, and workspace overrides.

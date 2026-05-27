@@ -224,5 +224,146 @@ def init(output: str):
     console.print(f"[green]Config saved to {output}[/green]")
 
 
+@main.command("meta-evolve")
+@click.option("--target", "-t", required=True, help="Meta-skill name (e.g., strategy_generation)")
+@click.option("--config", "-c", "config_path", type=click.Path(), default=None)
+@click.option("--suite", "-s", type=click.Path(exists=True), default=None, help="Custom test suite JSONL")
+@click.option("--workspace", "-w", type=click.Path(), default=None)
+@click.option("--tolerance", type=float, default=0.0, help="Allowed score drop before regression gate fails")
+@click.option("--dry-run", is_flag=True, help="Run full cycle without writing changes")
+@click.option("--provider", "-p", type=click.Choice(["claude", "openai"]), default=None)
+@click.option("--model", "-m", type=str, default=None)
+def meta_evolve(
+    target: str,
+    config_path: str | None,
+    suite: str | None,
+    workspace: str | None,
+    tolerance: float,
+    dry_run: bool,
+    provider: str | None,
+    model: str | None,
+):
+    """Evolve a meta-skill with regression safety.
+
+    Runs: snapshot → baseline score → evolve → candidate score → gate → accept/rollback
+    """
+    config = _load_config(config_path)
+    if provider:
+        config.llm.provider = provider
+    if model:
+        config.llm.model = model
+
+    from skill_evolution.core.meta_evolver import MetaSkillEvolver
+
+    ws = Path(workspace) if workspace else config.workspace_dir
+    evolver = MetaSkillEvolver(config, workspace=ws)
+    suite_path = Path(suite) if suite else None
+
+    result = asyncio.run(evolver.evolve(
+        target=target,
+        suite_path=suite_path,
+        dry_run=dry_run,
+        tolerance=tolerance,
+    ))
+
+    # Summary table
+    table = Table(title=f"Meta-Evolution: {target}")
+    table.add_column("Metric", style="bold")
+    table.add_column("Value")
+    table.add_row("Accepted", "[green]Yes[/green]" if result.accepted else "[red]No[/red]")
+    table.add_row("Baseline mean", f"{_scores_mean(result.baseline_scores):.3f}")
+    table.add_row("Candidate mean", f"{_scores_mean(result.candidate_scores):.3f}")
+    table.add_row("Gate", result.gate_verdict.summary)
+    if result.version:
+        table.add_row("Version", f"v{result.version:03d}")
+    console.print(table)
+
+
+@main.command("meta-test")
+@click.option("--target", "-t", required=True, help="Meta-skill name")
+@click.option("--config", "-c", "config_path", type=click.Path(), default=None)
+@click.option("--suite", "-s", type=click.Path(exists=True), default=None, help="Custom test suite JSONL")
+@click.option("--workspace", "-w", type=click.Path(), default=None)
+@click.option("--provider", "-p", type=click.Choice(["claude", "openai"]), default=None)
+@click.option("--model", "-m", type=str, default=None)
+def meta_test(
+    target: str,
+    config_path: str | None,
+    suite: str | None,
+    workspace: str | None,
+    provider: str | None,
+    model: str | None,
+):
+    """Run a meta-skill's test suite and display scores.
+
+    Calls the LLM with each test case and scores the output structurally.
+    """
+    config = _load_config(config_path)
+    if provider:
+        config.llm.provider = provider
+    if model:
+        config.llm.model = model
+
+    from skill_evolution.core.meta_evolver import MetaSkillEvolver
+
+    ws = Path(workspace) if workspace else config.workspace_dir
+    evolver = MetaSkillEvolver(config, workspace=ws)
+
+    skill = evolver._load_meta_skill_as_skill(target)
+    suite_path = Path(suite) if suite else None
+    scores = evolver.run_test_suite(target, skill.full_text, suite_path)
+
+    table = Table(title=f"Meta-Test: {target}")
+    table.add_column("Case", style="bold")
+    table.add_column("Score")
+    table.add_column("Status")
+
+    for case_id, score in sorted(scores.items()):
+        status = "[green]PASS[/green]" if score >= 0.8 else "[red]FAIL[/red]"
+        table.add_row(case_id, f"{score:.3f}", status)
+
+    table.add_row("", "", "")
+    table.add_row("[bold]Mean[/bold]", f"[bold]{_scores_mean(scores):.3f}[/bold]", "")
+    console.print(table)
+
+
+@main.command("meta-snapshot")
+@click.option("--target", "-t", required=True, help="Meta-skill name")
+@click.option("--workspace", "-w", type=click.Path(), default=".skill-evolution")
+def meta_snapshot(target: str, workspace: str):
+    """Show version history and scores for a meta-skill."""
+    vm = SkillVersionManager(Path(workspace), f"meta-{target}")
+    entries = vm.history()
+
+    if not entries:
+        console.print(f"[yellow]No snapshots found for meta-skill '{target}'[/yellow]")
+        return
+
+    table = Table(title=f"Meta-Skill Snapshots: {target}")
+    table.add_column("Version", style="bold")
+    table.add_column("Hash")
+    table.add_column("Mean Score")
+    table.add_column("Timestamp")
+    table.add_column("Notes", style="dim")
+
+    for entry in entries:
+        mean = _scores_mean(entry.scores) if entry.scores else float("nan")
+        score_str = f"{mean:.3f}" if entry.scores else "—"
+        table.add_row(
+            f"v{entry.version:03d}",
+            entry.content_hash,
+            score_str,
+            entry.timestamp[:19],
+            entry.notes[:50] + ("..." if len(entry.notes) > 50 else ""),
+        )
+
+    console.print(table)
+
+
+def _scores_mean(scores: dict[str, float]) -> float:
+    vals = list(scores.values())
+    return sum(vals) / len(vals) if vals else 0.0
+
+
 if __name__ == "__main__":
     main()

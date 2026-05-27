@@ -1,4 +1,4 @@
-"""Tests for CLI task loading and config resolution."""
+"""Tests for CLI task loading, config resolution, and meta-skill commands."""
 
 from __future__ import annotations
 
@@ -6,8 +6,9 @@ import json
 from pathlib import Path
 
 import pytest
+from click.testing import CliRunner
 
-from skill_evolution.cli import _load_config, _load_tasks
+from skill_evolution.cli import _load_config, _load_tasks, main
 
 
 class TestLoadTasks:
@@ -48,3 +49,34 @@ class TestLoadConfig:
 
         loaded = _load_config(str(path))
         assert loaded.llm.provider == "claude"
+
+
+class TestMetaCommands:
+    def test_meta_evolve_help(self):
+        runner = CliRunner()
+        result = runner.invoke(main, ["meta-evolve", "--help"])
+        assert result.exit_code == 0
+        assert "--target" in result.output
+        assert "--dry-run" in result.output
+        assert "--tolerance" in result.output
+
+    def test_meta_test_help(self):
+        runner = CliRunner()
+        result = runner.invoke(main, ["meta-test", "--help"])
+        assert result.exit_code == 0
+        assert "--target" in result.output
+
+    def test_meta_snapshot_help(self):
+        runner = CliRunner()
+        result = runner.invoke(main, ["meta-snapshot", "--help"])
+        assert result.exit_code == 0
+        assert "--target" in result.output
+
+    def test_meta_snapshot_empty(self, tmp_path: Path):
+        runner = CliRunner()
+        result = runner.invoke(main, [
+            "meta-snapshot", "--target", "strategy_generation",
+            "--workspace", str(tmp_path / "ws"),
+        ])
+        assert result.exit_code == 0
+        assert "No snapshots" in result.output
