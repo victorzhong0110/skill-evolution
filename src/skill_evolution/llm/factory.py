@@ -12,7 +12,10 @@ def create_llm(config: LLMConfig | None = None) -> LLMBackend:
         from skill_evolution.config import LLMConfig
         config = LLMConfig()
 
-    if config.provider == "cli":
+    if config.provider == "bridge":
+        from skill_evolution.llm.bridge_backend import BridgeBackend
+        return BridgeBackend(model=config.model)
+    elif config.provider == "cli":
         from skill_evolution.llm.cli_backend import CliLLMBackend
         return CliLLMBackend(model=config.model)
     elif config.provider == "claude":

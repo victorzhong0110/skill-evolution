@@ -60,7 +60,7 @@ def main():
 @click.option("--rounds", "-r", type=int, default=None, help="Override number of evolution rounds")
 @click.option("--strategies", "-k", type=int, default=None, help="Override number of strategies per task")
 @click.option("--budget", "-b", type=float, default=None, help="Max budget in USD")
-@click.option("--provider", "-p", type=click.Choice(["claude", "openai", "cli"]), default=None)
+@click.option("--provider", "-p", type=click.Choice(["claude", "openai", "cli", "bridge"]), default=None)
 @click.option("--model", "-m", type=str, default=None, help="LLM model name")
 @click.option("--output", "-o", type=click.Path(), default=None, help="Output path for evolved skill")
 @click.option("--workspace", "-w", type=click.Path(), default=None, help="Workspace directory for versioning")
@@ -127,7 +127,7 @@ def evolve(
 @main.command()
 @click.argument("skill_path", type=click.Path(exists=True))
 @click.option("--config", "-c", "config_path", type=click.Path(), default=None)
-@click.option("--provider", "-p", type=click.Choice(["claude", "openai", "cli"]), default=None)
+@click.option("--provider", "-p", type=click.Choice(["claude", "openai", "cli", "bridge"]), default=None)
 @click.option("--model", "-m", type=str, default=None)
 def audit(skill_path: str, config_path: str | None, provider: str | None, model: str | None):
     """Run an independent audit on a skill document."""
@@ -313,7 +313,7 @@ def doctor(workspace: str | None):
 @click.option("--workspace", "-w", type=click.Path(), default=None)
 @click.option("--tolerance", type=float, default=0.0, help="Allowed score drop before regression gate fails")
 @click.option("--dry-run", is_flag=True, help="Run full cycle without writing changes")
-@click.option("--provider", "-p", type=click.Choice(["claude", "openai", "cli"]), default=None)
+@click.option("--provider", "-p", type=click.Choice(["claude", "openai", "cli", "bridge"]), default=None)
 @click.option("--model", "-m", type=str, default=None)
 def meta_evolve(
     target: str,
@@ -366,7 +366,7 @@ def meta_evolve(
 @click.option("--config", "-c", "config_path", type=click.Path(), default=None)
 @click.option("--suite", "-s", type=click.Path(exists=True), default=None, help="Custom test suite JSONL")
 @click.option("--workspace", "-w", type=click.Path(), default=None)
-@click.option("--provider", "-p", type=click.Choice(["claude", "openai", "cli"]), default=None)
+@click.option("--provider", "-p", type=click.Choice(["claude", "openai", "cli", "bridge"]), default=None)
 @click.option("--model", "-m", type=str, default=None)
 def meta_test(
     target: str,

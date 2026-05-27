@@ -70,7 +70,7 @@ class CliLLMBackend(LLMBackend):
                 input=prompt,
                 capture_output=True,
                 text=True,
-                timeout=300,
+                timeout=600,
             )
         finally:
             if system_file:
