@@ -20,6 +20,7 @@ from pathlib import Path
 from rich.console import Console
 
 from skill_evolution.config import Config
+from skill_evolution.core.changelog import ChangelogEntry, append_changelog
 from skill_evolution.core.pipeline import EvolutionPipeline
 from skill_evolution.llm import create_llm
 from skill_evolution.meta_skills.loader import load_meta_skill
@@ -205,6 +206,22 @@ class MetaSkillEvolver:
             console.print("[yellow]Rejected: regression detected, keeping baseline[/yellow]")
         else:
             console.print("[dim]No meaningful changes produced[/dim]")
+
+        # Log to changelog
+        if not dry_run:
+            action = "accepted" if accepted else "rejected"
+            entry = ChangelogEntry(
+                meta_skill=target,
+                action=action,
+                baseline_mean=_mean(baseline_scores),
+                candidate_mean=_mean(candidate_scores),
+                delta=_mean(candidate_scores) - _mean(baseline_scores),
+                improved=verdict.improved,
+                regressed=verdict.regressed,
+                version=version,
+                summary=verdict.summary,
+            )
+            append_changelog(self._workspace, entry)
 
         return MetaEvolveResult(
             target=target,

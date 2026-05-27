@@ -26,17 +26,6 @@ CRITICAL RULES:
 4. Never remove correct information — only add, refine, or correct
 5. Keep the same writing style and structure as the original
 6. If signals conflict, prioritize higher-confidence signals
-
-Output the complete updated skill in two clearly labeled sections:
-
-===UPDATED_BODY===
-<the complete updated body text>
-
-===UPDATED_APPENDIX===
-<the complete updated appendix text>
-
-===CHANGELOG===
-- <what you changed and why, one line per change>
 """
 
 _OUTPUT_FORMAT = """

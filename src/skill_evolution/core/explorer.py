@@ -31,16 +31,6 @@ Each strategy must:
 1. Take a fundamentally different approach (not just reword the same idea)
 2. Be concrete enough for an agent to follow
 3. Leverage the skill document where relevant, but also explore beyond it
-
-Output format (STRICTLY follow this):
-===STRATEGY 1===
-Name: <short name>
-Description: <1-2 sentence summary>
-Approach:
-<detailed step-by-step approach>
-
-===STRATEGY 2===
-...
 """
 
 _OUTPUT_FORMAT = """

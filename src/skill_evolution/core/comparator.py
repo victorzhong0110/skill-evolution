@@ -41,20 +41,6 @@ For each signal, classify it:
 Also classify WHERE the fix should go (inspired by EmbodiSkill):
 - body: The core skill content needs to change (skill defect)
 - appendix: The skill is correct but agents don't follow it (execution lapse — add reinforcement)
-
-Output format:
-===SIGNAL 1===
-Category: <category>
-Affects: <body|appendix>
-Confidence: <0.0-1.0>
-Description: <what needs to change>
-Evidence: <specific quotes/observations from trajectories>
-
-===SIGNAL 2===
-...
-
-===END===
-If no meaningful signals found, output ===NO_SIGNALS===
 """
 
 _OUTPUT_FORMAT = """

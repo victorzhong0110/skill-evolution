@@ -224,6 +224,88 @@ def init(output: str):
     console.print(f"[green]Config saved to {output}[/green]")
 
 
+@main.command()
+@click.option("--workspace", "-w", type=click.Path(), default=None)
+def doctor(workspace: str | None):
+    """Validate meta-skill files, placeholders, and test suites."""
+    from skill_evolution.meta_skills.testing.loader import list_builtin_suites, load_builtin_suite
+
+    ws = Path(workspace) if workspace else None
+    issues: list[tuple[str, str]] = []  # (severity, message)
+    checks_passed = 0
+
+    meta_skills_dir = Path(__file__).parent / "meta_skills"
+    meta_skill_names = [p.stem for p in meta_skills_dir.glob("*.md")]
+
+    # Check: meta-skill files parse as valid Skill objects
+    for name in meta_skill_names:
+        path = meta_skills_dir / f"{name}.md"
+        try:
+            skill = Skill.from_file(path)
+            if not skill.body.strip():
+                issues.append(("WARN", f"Meta-skill '{name}' has empty body"))
+            else:
+                checks_passed += 1
+                console.print(f"  [green]OK[/green] {name}.md parses correctly")
+        except Exception as exc:
+            issues.append(("FAIL", f"Meta-skill '{name}' failed to parse: {exc}"))
+
+    # Check: {k} placeholder in strategy_generation
+    sg_path = meta_skills_dir / "strategy_generation.md"
+    if sg_path.exists():
+        content = sg_path.read_text(encoding="utf-8")
+        if "{k}" in content:
+            checks_passed += 1
+            console.print("  [green]OK[/green] strategy_generation.md contains {k} placeholder")
+        else:
+            issues.append(("FAIL", "strategy_generation.md missing {k} placeholder"))
+
+    # Check: test suites load without errors
+    for suite_name in list_builtin_suites():
+        try:
+            cases = load_builtin_suite(suite_name)
+            has_adversarial = any("adversarial" in c.tags for c in cases)
+            has_edge = any("edge_case" in c.tags for c in cases)
+            checks_passed += 1
+            console.print(f"  [green]OK[/green] Test suite '{suite_name}': {len(cases)} cases")
+            if not has_adversarial:
+                issues.append(("WARN", f"Test suite '{suite_name}' has no adversarial cases"))
+            if not has_edge:
+                issues.append(("WARN", f"Test suite '{suite_name}' has no edge cases"))
+        except Exception as exc:
+            issues.append(("FAIL", f"Test suite '{suite_name}' failed to load: {exc}"))
+
+    # Check: workspace overrides (if workspace provided)
+    if ws:
+        ws_meta = ws / "meta_skills"
+        if ws_meta.exists():
+            for md in ws_meta.glob("*.md"):
+                try:
+                    Skill.from_file(md)
+                    checks_passed += 1
+                    console.print(f"  [green]OK[/green] Workspace override '{md.stem}' parses correctly")
+                except Exception as exc:
+                    issues.append(("FAIL", f"Workspace override '{md.stem}' failed: {exc}"))
+
+    # Summary
+    console.print()
+    fails = [i for i in issues if i[0] == "FAIL"]
+    warns = [i for i in issues if i[0] == "WARN"]
+
+    for severity, msg in issues:
+        style = "red" if severity == "FAIL" else "yellow"
+        console.print(f"  [{style}]{severity}[/{style}] {msg}")
+
+    console.print()
+    if fails:
+        console.print(f"[red]UNHEALTHY: {len(fails)} failures, {len(warns)} warnings, {checks_passed} passed[/red]")
+        raise SystemExit(1)
+    elif warns:
+        console.print(f"[yellow]HEALTHY with warnings: {len(warns)} warnings, {checks_passed} passed[/yellow]")
+    else:
+        console.print(f"[green]HEALTHY: {checks_passed} checks passed[/green]")
+
+
 @main.command("meta-evolve")
 @click.option("--target", "-t", required=True, help="Meta-skill name (e.g., strategy_generation)")
 @click.option("--config", "-c", "config_path", type=click.Path(), default=None)
@@ -330,9 +412,11 @@ def meta_test(
 @main.command("meta-snapshot")
 @click.option("--target", "-t", required=True, help="Meta-skill name")
 @click.option("--workspace", "-w", type=click.Path(), default=".skill-evolution")
-def meta_snapshot(target: str, workspace: str):
+@click.option("--history", "show_history", is_flag=True, help="Show evolution changelog with score trend")
+def meta_snapshot(target: str, workspace: str, show_history: bool):
     """Show version history and scores for a meta-skill."""
-    vm = SkillVersionManager(Path(workspace), f"meta-{target}")
+    ws_path = Path(workspace)
+    vm = SkillVersionManager(ws_path, f"meta-{target}")
     entries = vm.history()
 
     if not entries:
@@ -343,21 +427,68 @@ def meta_snapshot(target: str, workspace: str):
     table.add_column("Version", style="bold")
     table.add_column("Hash")
     table.add_column("Mean Score")
+    table.add_column("Trend")
     table.add_column("Timestamp")
     table.add_column("Notes", style="dim")
 
+    prev_mean = None
     for entry in entries:
-        mean = _scores_mean(entry.scores) if entry.scores else float("nan")
-        score_str = f"{mean:.3f}" if entry.scores else "—"
+        mean = _scores_mean(entry.scores) if entry.scores else None
+        score_str = f"{mean:.3f}" if mean is not None else "—"
+        if mean is not None and prev_mean is not None:
+            delta = mean - prev_mean
+            if delta > 0.01:
+                trend = f"[green]+{delta:.3f}[/green]"
+            elif delta < -0.01:
+                trend = f"[red]{delta:.3f}[/red]"
+            else:
+                trend = "[dim]=[/dim]"
+        else:
+            trend = "—"
         table.add_row(
             f"v{entry.version:03d}",
             entry.content_hash,
             score_str,
+            trend,
             entry.timestamp[:19],
             entry.notes[:50] + ("..." if len(entry.notes) > 50 else ""),
         )
+        if mean is not None:
+            prev_mean = mean
 
     console.print(table)
+
+    if show_history:
+        from skill_evolution.core.changelog import read_changelog_for_skill
+
+        changelog = read_changelog_for_skill(ws_path, target)
+        if not changelog:
+            console.print("[dim]No changelog entries found[/dim]")
+            return
+
+        console.print()
+        ht = Table(title=f"Evolution History: {target}")
+        ht.add_column("Time", style="dim")
+        ht.add_column("Action")
+        ht.add_column("Baseline")
+        ht.add_column("Candidate")
+        ht.add_column("Delta")
+        ht.add_column("Gate")
+
+        for e in changelog:
+            action_style = "green" if e.action == "accepted" else "red"
+            delta_str = f"{e.delta:+.3f}"
+            delta_style = "green" if e.delta > 0 else ("red" if e.delta < 0 else "dim")
+            ht.add_row(
+                e.timestamp[:19],
+                f"[{action_style}]{e.action}[/{action_style}]",
+                f"{e.baseline_mean:.3f}",
+                f"{e.candidate_mean:.3f}",
+                f"[{delta_style}]{delta_str}[/{delta_style}]",
+                e.summary,
+            )
+
+        console.print(ht)
 
 
 def _scores_mean(scores: dict[str, float]) -> float:

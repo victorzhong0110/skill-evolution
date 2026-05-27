@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import re
 from datetime import datetime, timezone
 from pathlib import Path
@@ -10,6 +11,8 @@ from typing import Any
 
 import yaml
 from pydantic import BaseModel, Field
+
+logger = logging.getLogger(__name__)
 
 
 class SkillMetadata(BaseModel):
@@ -88,7 +91,7 @@ class Skill(BaseModel):
                 meta_raw = yaml.safe_load(fm_match.group(1)) or {}
                 metadata = SkillMetadata.model_validate(meta_raw)
             except Exception:
-                pass  # Malformed front matter — use defaults
+                logger.warning("Malformed YAML front matter, using defaults", exc_info=True)
             body = text[fm_match.end():]
 
         # Split body and appendix
