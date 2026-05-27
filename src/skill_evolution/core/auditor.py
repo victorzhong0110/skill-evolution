@@ -120,10 +120,9 @@ Audit this skill document."""
     def _parse_report(self, text: str) -> AuditReport:
         """Parse audit output into an AuditReport."""
         findings = []
-        overall_severity = AuditSeverity.PASS
+        overall_severity = AuditSeverity.WARNING
         summary = ""
 
-        # Parse individual checks
         check_blocks = text.split("===CHECK:")
         for block in check_blocks[1:]:
             if "===OVERALL===" in block:
@@ -156,7 +155,6 @@ Audit this skill document."""
                 suggestion=suggestion,
             ))
 
-        # Parse overall assessment
         if "===OVERALL===" in text:
             overall_block = text.split("===OVERALL===")[1]
             for line in overall_block.split("\n"):
@@ -167,8 +165,13 @@ Audit this skill document."""
                         overall_severity = AuditSeverity.FAIL
                     elif "WARNING" in raw:
                         overall_severity = AuditSeverity.WARNING
+                    else:
+                        overall_severity = AuditSeverity.PASS
                 elif stripped.startswith("Summary:"):
                     summary = stripped[len("Summary:"):].strip()
+        elif not findings:
+            overall_severity = AuditSeverity.FAIL
+            summary = "Unparseable audit output — defaulting to FAIL"
 
         return AuditReport(
             findings=findings,

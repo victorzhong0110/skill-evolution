@@ -388,6 +388,13 @@ class TestComparatorIntegration:
             outcome_reason="test",
         )
 
+    def test_empty_trajectories_returns_empty(self):
+        llm = MockLLM()
+        comparator = Comparator(llm)
+        signals = asyncio.run(comparator.compare([], "skill text"))
+        assert signals == []
+        assert llm.usage.calls == 0
+
     def test_contrastive_analysis(self):
         llm = MockLLM(default=COMPARATOR_ONE_SIGNAL)
         comparator = Comparator(llm)

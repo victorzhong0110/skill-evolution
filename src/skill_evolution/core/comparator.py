@@ -74,6 +74,9 @@ class Comparator:
         skill_text: str,
     ) -> list[DeltaSignal]:
         """Compare trajectories and extract delta signals."""
+        if not trajectories:
+            return []
+
         successes = [t for t in trajectories if t.outcome == TaskOutcome.SUCCESS]
         failures = [t for t in trajectories if t.outcome != TaskOutcome.SUCCESS]
 
