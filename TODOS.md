@@ -65,3 +65,11 @@
 **Depends on:** Evaluation circularity investigation (above).
 
 ## Completed
+
+### Phase 0: Bug Fixes (T1, T2, T2-ext, T3)
+
+Replaced self-assessment with external TaskEvaluator protocol, fixed {k} placeholder, added deep-copy + audit rollback.
+
+### Phase 1: Test Suite Infrastructure (T7a, T7b, T7c)
+
+Added EvalCase/ScoreResult models with JSONL serialization, test suite loader, and structural scoring functions for strategy_generation and trajectory_comparison meta-skills. Each suite has 6 test cases including adversarial and edge cases. Scoring uses deterministic metrics (v1) to avoid evaluation circularity.
