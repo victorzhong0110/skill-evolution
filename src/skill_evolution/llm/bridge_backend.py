@@ -30,7 +30,7 @@ from skill_evolution.llm.base import LLMBackend, LLMResponse
 logger = logging.getLogger(__name__)
 
 _DEFAULT_BRIDGE_DIR = Path("/tmp/skill-evolution-bridge")
-_DEFAULT_TIMEOUT = 300  # seconds
+_DEFAULT_TIMEOUT = 600  # seconds (10 min per request)
 _POLL_INTERVAL = 0.5  # seconds
 
 
