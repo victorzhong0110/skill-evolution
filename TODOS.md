@@ -2,17 +2,7 @@
 
 ## Core Pipeline
 
-### LLM pricing hardcoded in base.py
-
-**What:** Move LLM model pricing out of hardcoded dictionaries in `llm/base.py:31-32` into a configuration file or make pricing optional.
-
-**Why:** Model pricing changes frequently. Hardcoded values silently become inaccurate, and adding new model support requires code changes. This is a maintenance burden for an open-source tool.
-
-**Context:** `base.py` has `INPUT_PRICING` and `OUTPUT_PRICING` dicts with per-model dollar amounts. Options: (a) move to a YAML/JSON config file, (b) fetch from an API, or (c) make pricing optional with a "pricing unavailable" fallback. Option (c) is simplest for v1.
-
-**Effort:** S
-**Priority:** P3
-**Depends on:** None
+No open items.
 
 ## Meta-Skill Evolution
 
@@ -51,3 +41,7 @@ Comparator.compare() now returns empty list on empty trajectories. Auditor._pars
 ### Investigations Resolved (Evaluation Circularity, T7c Scoring)
 
 V1 uses purely structural/deterministic scoring (format compliance, count accuracy, Jaccard diversity) — avoids evaluation circularity entirely. LLM-as-judge can be added as a v2 enhancement.
+
+### LLM Pricing Configurable (P3)
+
+Extracted MODEL_PRICING lookup table with per-model pricing. TokenUsageTracker.for_model() auto-selects pricing; unknown models fall back to default. Backends pass model name to base class.

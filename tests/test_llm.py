@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from skill_evolution.config import LLMConfig
-from skill_evolution.llm.base import LLMResponse, TokenUsageTracker
+from skill_evolution.llm.base import MODEL_PRICING, LLMResponse, TokenUsageTracker
 from skill_evolution.llm.factory import create_llm
 
 
@@ -43,6 +43,23 @@ class TestTokenUsageTracker:
         assert "Calls: 1" in summary
         assert "500" in summary
         assert "100" in summary
+
+    def test_for_model_known(self):
+        tracker = TokenUsageTracker.for_model("claude-opus-4-20250514")
+        assert tracker._cost_per_input_mtok == 15.0
+        assert tracker._cost_per_output_mtok == 75.0
+
+    def test_for_model_unknown_uses_default(self):
+        tracker = TokenUsageTracker.for_model("some-unknown-model")
+        assert tracker._cost_per_input_mtok == 3.0
+        assert tracker._cost_per_output_mtok == 15.0
+
+    def test_for_model_gpt4o(self):
+        tracker = TokenUsageTracker.for_model("gpt-4o")
+        assert tracker._cost_per_input_mtok == 2.5
+
+    def test_model_pricing_dict_has_entries(self):
+        assert len(MODEL_PRICING) >= 3
 
 
 class TestLLMResponse:

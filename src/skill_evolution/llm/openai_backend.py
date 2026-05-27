@@ -18,7 +18,7 @@ class OpenAIBackend(LLMBackend):
         api_key: str | None = None,
         base_url: str | None = None,
     ):
-        super().__init__()
+        super().__init__(model=model)
         self.model = model
         self.client = AsyncOpenAI(
             api_key=api_key or os.environ.get("OPENAI_API_KEY", "sk-placeholder"),
