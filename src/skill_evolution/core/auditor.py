@@ -8,8 +8,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+from pathlib import Path
 
 from skill_evolution.llm.base import LLMBackend
+from skill_evolution.meta_skills.loader import load_meta_skill
 from skill_evolution.skill.schema import Skill
 
 
@@ -42,10 +44,7 @@ class AuditReport:
         return self.overall != AuditSeverity.FAIL
 
 
-class Auditor:
-    """Reviews evolved skills for overfitting, hardcoding, and other quality issues."""
-
-    SYSTEM_PROMPT = """\
+_FALLBACK_PROMPT = """\
 You are an independent skill quality auditor. You review AI agent skill documents \
 for potential problems. You have NOT seen the evolution process — you only see the \
 skill document and must assess it purely on its own merits.
@@ -76,8 +75,29 @@ Severity: PASS | WARNING | FAIL
 Summary: <1-2 sentence overall assessment>
 """
 
-    def __init__(self, llm: LLMBackend):
+_OUTPUT_FORMAT = """
+Output format:
+===CHECK: <check_name>===
+Severity: PASS | WARNING | FAIL
+Description: <what you found>
+Suggestion: <how to fix it, if applicable>
+
+===CHECK: ...===
+...
+
+===OVERALL===
+Severity: PASS | WARNING | FAIL
+Summary: <1-2 sentence overall assessment>
+"""
+
+
+class Auditor:
+    """Reviews evolved skills for overfitting, hardcoding, and other quality issues."""
+
+    def __init__(self, llm: LLMBackend, workspace: Path | None = None):
         self.llm = llm
+        base_prompt = load_meta_skill("skill_audit", _FALLBACK_PROMPT, workspace)
+        self._system_prompt = base_prompt + _OUTPUT_FORMAT
 
     async def audit(self, skill: Skill) -> AuditReport:
         """Run an independent audit on a skill document."""
@@ -94,7 +114,7 @@ Summary: <1-2 sentence overall assessment>
 
 Audit this skill document."""
 
-        resp = await self.llm.ask(prompt=prompt, system=self.SYSTEM_PROMPT, temperature=0.3)
+        resp = await self.llm.ask(prompt=prompt, system=self._system_prompt, temperature=0.3)
         return self._parse_report(resp.content)
 
     def _parse_report(self, text: str) -> AuditReport:

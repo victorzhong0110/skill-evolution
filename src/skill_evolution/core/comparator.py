@@ -7,8 +7,10 @@ what specifically made the difference between success and failure.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
 from skill_evolution.llm.base import LLMBackend
+from skill_evolution.meta_skills.loader import load_meta_skill
 from skill_evolution.runner.executor import TaskOutcome, Trajectory
 
 
@@ -23,10 +25,7 @@ class DeltaSignal:
     affects: str  # "body" or "appendix" (EmbodiSkill-inspired targeting)
 
 
-class Comparator:
-    """Extracts improvement signals by comparing successful vs failed trajectories."""
-
-    SYSTEM_PROMPT = """\
+_FALLBACK_PROMPT = """\
 You are a skill improvement analyst. You compare successful and failed task execution \
 trajectories to identify what made the difference.
 
@@ -58,8 +57,30 @@ Evidence: <specific quotes/observations from trajectories>
 If no meaningful signals found, output ===NO_SIGNALS===
 """
 
-    def __init__(self, llm: LLMBackend):
+_OUTPUT_FORMAT = """
+Output format:
+===SIGNAL 1===
+Category: <category>
+Affects: <body|appendix>
+Confidence: <0.0-1.0>
+Description: <what needs to change>
+Evidence: <specific quotes/observations from trajectories>
+
+===SIGNAL 2===
+...
+
+===END===
+If no meaningful signals found, output ===NO_SIGNALS===
+"""
+
+
+class Comparator:
+    """Extracts improvement signals by comparing successful vs failed trajectories."""
+
+    def __init__(self, llm: LLMBackend, workspace: Path | None = None):
         self.llm = llm
+        base_prompt = load_meta_skill("trajectory_comparison", _FALLBACK_PROMPT, workspace)
+        self._system_prompt = base_prompt + _OUTPUT_FORMAT
 
     async def compare(
         self,
@@ -115,7 +136,7 @@ If no meaningful signals found, output ===NO_SIGNALS===
 Compare the successful and failed trajectories. What specific knowledge or approach \
 differences led to success vs failure? Extract delta signals for improving the skill."""
 
-        resp = await self.llm.ask(prompt=prompt, system=self.SYSTEM_PROMPT, temperature=0.4)
+        resp = await self.llm.ask(prompt=prompt, system=self._system_prompt, temperature=0.4)
         return self._parse_signals(resp.content)
 
     async def _analyze_failures(
@@ -141,7 +162,7 @@ differences led to success vs failure? Extract delta signals for improving the s
 All strategies failed. Analyze the common failure patterns and identify what the skill \
 is missing or getting wrong. Extract delta signals."""
 
-        resp = await self.llm.ask(prompt=prompt, system=self.SYSTEM_PROMPT, temperature=0.4)
+        resp = await self.llm.ask(prompt=prompt, system=self._system_prompt, temperature=0.4)
         return self._parse_signals(resp.content)
 
     async def _analyze_efficiency(
@@ -168,7 +189,7 @@ All strategies succeeded. Look for efficiency improvements — could the skill b
 concise? Are there redundant instructions? Could agents solve tasks with fewer steps? \
 Extract optimization signals."""
 
-        resp = await self.llm.ask(prompt=prompt, system=self.SYSTEM_PROMPT, temperature=0.4)
+        resp = await self.llm.ask(prompt=prompt, system=self._system_prompt, temperature=0.4)
         return self._parse_signals(resp.content)
 
     def _parse_signals(self, text: str) -> list[DeltaSignal]:

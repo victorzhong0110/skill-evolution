@@ -112,8 +112,8 @@ def evolve(
 
     # Run evolution
     from skill_evolution.core.pipeline import EvolutionPipeline
-    pipeline = EvolutionPipeline(config)
     ws = Path(workspace) if workspace else config.workspace_dir
+    pipeline = EvolutionPipeline(config, workspace=ws)
 
     evolved_skill, report = asyncio.run(pipeline.evolve(skill, tasks, ws))
 
@@ -142,7 +142,7 @@ def audit(skill_path: str, config_path: str | None, provider: str | None, model:
     from skill_evolution.core.auditor import Auditor
     from skill_evolution.llm import create_llm
 
-    auditor = Auditor(create_llm(config.llm))
+    auditor = Auditor(create_llm(config.llm), workspace=config.workspace_dir)
     report = asyncio.run(auditor.audit(skill))
 
     # Display results

@@ -6,15 +6,15 @@ Only modify what the signals indicate, preserve everything else.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from skill_evolution.core.comparator import DeltaSignal
 from skill_evolution.llm.base import LLMBackend
+from skill_evolution.meta_skills.loader import load_meta_skill
 from skill_evolution.skill.schema import Skill
 
 
-class Patcher:
-    """Applies delta signals to evolve a skill document."""
-
-    SYSTEM_PROMPT = """\
+_FALLBACK_PROMPT = """\
 You are a precision skill editor. You receive a skill document and a set of delta signals \
 (improvement instructions). Your job is to apply TARGETED, MINIMAL patches.
 
@@ -39,8 +39,27 @@ Output the complete updated skill in two clearly labeled sections:
 - <what you changed and why, one line per change>
 """
 
-    def __init__(self, llm: LLMBackend):
+_OUTPUT_FORMAT = """
+Output the complete updated skill in two clearly labeled sections:
+
+===UPDATED_BODY===
+<the complete updated body text>
+
+===UPDATED_APPENDIX===
+<the complete updated appendix text>
+
+===CHANGELOG===
+- <what you changed and why, one line per change>
+"""
+
+
+class Patcher:
+    """Applies delta signals to evolve a skill document."""
+
+    def __init__(self, llm: LLMBackend, workspace: Path | None = None):
         self.llm = llm
+        base_prompt = load_meta_skill("skill_patch", _FALLBACK_PROMPT, workspace)
+        self._system_prompt = base_prompt + _OUTPUT_FORMAT
 
     async def patch(self, skill: Skill, signals: list[DeltaSignal]) -> tuple[Skill, str]:
         """Apply delta signals to a skill. Returns (updated_skill, changelog)."""
@@ -70,7 +89,7 @@ Output the complete updated skill in two clearly labeled sections:
 
 Apply these signals as targeted patches. Remember: minimal changes, preserve everything else."""
 
-        resp = await self.llm.ask(prompt=prompt, system=self.SYSTEM_PROMPT, temperature=0.3)
+        resp = await self.llm.ask(prompt=prompt, system=self._system_prompt, temperature=0.3)
         return self._parse_patched_skill(resp.content, skill)
 
     def _parse_patched_skill(self, text: str, original: Skill) -> tuple[Skill, str]:

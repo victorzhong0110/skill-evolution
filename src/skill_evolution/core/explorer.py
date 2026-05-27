@@ -7,8 +7,10 @@ ensuring each strategy takes a meaningfully different approach.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
 from skill_evolution.llm.base import LLMBackend
+from skill_evolution.meta_skills.loader import load_meta_skill
 
 
 @dataclass
@@ -21,10 +23,7 @@ class Strategy:
     approach: str  # Detailed step-by-step approach
 
 
-class Explorer:
-    """Generates diverse strategies for a given task using an LLM."""
-
-    SYSTEM_PROMPT = """\
+_FALLBACK_PROMPT = """\
 You are a strategy diversification expert. Given a task description and a skill document, \
 generate {k} meaningfully different high-level strategies for solving the task.
 
@@ -44,8 +43,26 @@ Approach:
 ...
 """
 
-    def __init__(self, llm: LLMBackend):
+_OUTPUT_FORMAT = """
+Output format (STRICTLY follow this):
+===STRATEGY 1===
+Name: <short name>
+Description: <1-2 sentence summary>
+Approach:
+<detailed step-by-step approach>
+
+===STRATEGY 2===
+...
+"""
+
+
+class Explorer:
+    """Generates diverse strategies for a given task using an LLM."""
+
+    def __init__(self, llm: LLMBackend, workspace: Path | None = None):
         self.llm = llm
+        base_prompt = load_meta_skill("strategy_generation", _FALLBACK_PROMPT, workspace)
+        self._system_prompt = base_prompt + _OUTPUT_FORMAT
 
     async def generate_strategies(
         self,
@@ -63,9 +80,10 @@ Approach:
 
 Generate exactly {k} diverse strategies."""
 
+        system = self._system_prompt.replace("{k}", str(k))
         resp = await self.llm.ask(
             prompt=prompt,
-            system=self.SYSTEM_PROMPT.format(k=k),
+            system=system,
             temperature=0.9,  # Higher temperature for diversity
         )
         return self._parse_strategies(resp.content)

@@ -82,15 +82,16 @@ class EvolutionReport:
 class EvolutionPipeline:
     """Main orchestrator for skill evolution."""
 
-    def __init__(self, config: Config):
+    def __init__(self, config: Config, workspace: Path | None = None):
         self.config = config
+        self._workspace = workspace or config.workspace_dir
         self.llm = create_llm(config.llm)
-        self.explorer = Explorer(self.llm)
+        self.explorer = Explorer(self.llm, workspace=self._workspace)
         self.executor = TaskExecutor(self.llm)
-        self.comparator = Comparator(self.llm)
-        self.patcher = Patcher(self.llm)
+        self.comparator = Comparator(self.llm, workspace=self._workspace)
+        self.patcher = Patcher(self.llm, workspace=self._workspace)
         # Auditor uses a separate LLM instance for independence
-        self.auditor = Auditor(create_llm(config.llm))
+        self.auditor = Auditor(create_llm(config.llm), workspace=self._workspace)
 
     async def evolve(
         self,
