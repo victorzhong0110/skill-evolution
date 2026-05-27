@@ -1,4 +1,4 @@
-"""LLM abstraction layer supporting Claude and OpenAI-compatible backends."""
+"""LLM abstraction layer supporting Claude API, OpenAI-compatible, and CLI backends."""
 
 from skill_evolution.llm.base import LLMBackend, LLMResponse
 from skill_evolution.llm.factory import create_llm

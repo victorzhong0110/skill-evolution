@@ -246,14 +246,33 @@ class MetaSkillEvolver:
             return (
                 f"## Skill Document\n{data.get('skill_text', '')}\n\n"
                 f"## Task\n{data.get('task', '')}\n\n"
-                f"Generate exactly {k} diverse strategies."
+                f"Generate exactly {k} diverse strategies.\n\n"
+                f"You MUST use this exact output format:\n"
+                f"===STRATEGY 1===\n"
+                f"Name: <short name>\n"
+                f"Description: <1-2 sentence summary>\n"
+                f"Approach:\n"
+                f"<detailed step-by-step approach>\n\n"
+                f"===STRATEGY 2===\n"
+                f"..."
             )
         elif name == "trajectory_comparison":
             return (
                 f"## Current Skill Document\n{data.get('skill_text', '')}\n\n"
                 f"## Successful Trajectory\n{data.get('success_response', '')}\n\n"
                 f"## Failed Trajectory\n{data.get('failure_response', '')}\n\n"
-                "Compare these trajectories and extract delta signals."
+                "Compare these trajectories and extract delta signals.\n\n"
+                "You MUST use this exact output format:\n"
+                "===SIGNAL 1===\n"
+                "Category: <missing_knowledge|wrong_approach|edge_case|efficiency>\n"
+                "Affects: <body|appendix>\n"
+                "Confidence: <0.0-1.0>\n"
+                "Description: <what needs to change>\n"
+                "Evidence: <specific observations from trajectories>\n\n"
+                "===SIGNAL 2===\n"
+                "...\n\n"
+                "===END===\n"
+                "If no meaningful signals found, output ===NO_SIGNALS==="
             )
         return f"Execute this test case:\n{case.model_dump_json(indent=2)}"
 

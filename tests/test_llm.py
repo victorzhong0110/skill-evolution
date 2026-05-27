@@ -79,6 +79,11 @@ class TestFactory:
         backend = create_llm(cfg)
         assert backend.__class__.__name__ == "OpenAIBackend"
 
+    def test_create_cli_backend(self):
+        cfg = LLMConfig(provider="cli", model="claude-sonnet-4-20250514")
+        backend = create_llm(cfg)
+        assert backend.__class__.__name__ == "CliLLMBackend"
+
     def test_unknown_provider_raises(self):
         from pydantic import ValidationError
 

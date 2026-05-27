@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 class LLMConfig(BaseModel):
     """LLM backend configuration."""
 
-    provider: Literal["claude", "openai"] = "claude"
+    provider: Literal["claude", "openai", "cli"] = "claude"
     model: str = "claude-sonnet-4-20250514"
     api_key: str | None = None  # Falls back to env var
     base_url: str | None = None  # For OpenAI-compatible endpoints

@@ -12,7 +12,10 @@ def create_llm(config: LLMConfig | None = None) -> LLMBackend:
         from skill_evolution.config import LLMConfig
         config = LLMConfig()
 
-    if config.provider == "claude":
+    if config.provider == "cli":
+        from skill_evolution.llm.cli_backend import CliLLMBackend
+        return CliLLMBackend(model=config.model)
+    elif config.provider == "claude":
         from skill_evolution.llm.claude_backend import ClaudeBackend
         return ClaudeBackend(model=config.model, api_key=config.api_key)
     elif config.provider == "openai":
