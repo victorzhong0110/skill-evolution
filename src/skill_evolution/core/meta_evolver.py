@@ -131,7 +131,7 @@ class MetaSkillEvolver:
                 import concurrent.futures
                 with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
                     future = pool.submit(asyncio.run, coro)
-                    return future.result(timeout=180).content
+                    return future.result(timeout=300).content
             return asyncio.run(coro).content
 
         suite_result = score_meta_skill(name, cases, output_fn)

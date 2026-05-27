@@ -12,7 +12,7 @@ from skill_evolution.llm.base import LLMBackend, LLMResponse
 class ClaudeBackend(LLMBackend):
     """Claude via Anthropic API."""
 
-    def __init__(self, model: str = "claude-sonnet-4-20250514", api_key: str | None = None):
+    def __init__(self, model: str = "claude-sonnet-4-6", api_key: str | None = None):
         super().__init__(model=model)
         self.model = model
         self.client = AsyncAnthropic(api_key=api_key or os.environ.get("ANTHROPIC_API_KEY"))

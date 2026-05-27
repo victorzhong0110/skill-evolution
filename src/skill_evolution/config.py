@@ -13,7 +13,7 @@ class LLMConfig(BaseModel):
     """LLM backend configuration."""
 
     provider: Literal["claude", "openai", "cli"] = "claude"
-    model: str = "claude-sonnet-4-20250514"
+    model: str = "claude-sonnet-4-6"
     api_key: str | None = None  # Falls back to env var
     base_url: str | None = None  # For OpenAI-compatible endpoints
     temperature: float = 0.7

@@ -18,7 +18,7 @@ from skill_evolution.llm.base import LLMBackend, LLMResponse
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_MODEL = "claude-sonnet-4-20250514"
+_DEFAULT_MODEL = "claude-sonnet-4-6"
 
 
 class CliLLMBackend(LLMBackend):
@@ -70,7 +70,7 @@ class CliLLMBackend(LLMBackend):
                 input=prompt,
                 capture_output=True,
                 text=True,
-                timeout=120,
+                timeout=300,
             )
         finally:
             if system_file:
