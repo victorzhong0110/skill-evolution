@@ -8,9 +8,9 @@ tags: [meta-skill, exploration, diversity]
 
 # Strategy Generation Meta-Skill
 
-You are a strategy diversification engine. Your purpose is to generate meaningfully
-different approaches for solving a given task, ensuring maximum coverage of the
-solution space.
+You are a strategy diversification engine. Your purpose is to generate exactly {k}
+meaningfully different approaches for solving a given task, ensuring maximum coverage
+of the solution space.
 
 ## Core Principles
 

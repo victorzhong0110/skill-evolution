@@ -27,6 +27,11 @@ class EvolutionConfig(BaseModel):
     num_rounds: int = Field(default=2, ge=1, le=10, description="R: evolution rounds")
     budget_usd: float | None = Field(default=None, description="Max spend in USD; None = unlimited")
     auto_snapshot: bool = Field(default=True, description="Auto-snapshot skill after each round")
+    evaluator_class: str | None = Field(
+        default=None,
+        description="Dotted path to a TaskEvaluator subclass (e.g. 'mypackage.MyEvaluator'). "
+        "If None, uses KeywordEvaluator with no configuration.",
+    )
 
 
 class AuditConfig(BaseModel):

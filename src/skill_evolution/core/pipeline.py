@@ -3,9 +3,10 @@
 Flow per round:
   1. Explorer: generate K diverse strategies
   2. Executor: run each strategy on each task (independent agents)
-  3. Comparator: compare successes vs failures, extract delta signals
-  4. Patcher: apply targeted patches to the skill
-  5. Auditor: independent review; if FAIL, feed findings back as next-round signals
+  3. Evaluator: externally evaluate each trajectory (replaces self-assessment)
+  4. Comparator: compare successes vs failures, extract delta signals
+  5. Patcher: apply targeted patches to the skill (on a deep copy)
+  6. Auditor: independent review; if FAIL, rollback + feed findings as DeltaSignals
 
 This loops for R rounds or until budget is exhausted.
 """
@@ -13,6 +14,8 @@ This loops for R rounds or until budget is exhausted.
 from __future__ import annotations
 
 import asyncio
+import copy
+import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -27,11 +30,19 @@ from skill_evolution.core.auditor import Auditor, AuditReport, AuditSeverity
 from skill_evolution.core.comparator import Comparator, DeltaSignal
 from skill_evolution.core.explorer import Explorer
 from skill_evolution.core.patcher import Patcher
+from skill_evolution.evaluation.evaluator import (
+    EvalResult,
+    KeywordEvaluator,
+    TaskEvaluator,
+    load_evaluator_class,
+)
 from skill_evolution.llm import create_llm
 from skill_evolution.llm.base import LLMBackend
 from skill_evolution.runner.executor import TaskExecutor, TaskOutcome, Trajectory
 from skill_evolution.skill.schema import Skill
 from skill_evolution.skill.versioning import SkillVersionManager
+
+logger = logging.getLogger(__name__)
 
 console = Console()
 
@@ -90,8 +101,16 @@ class EvolutionPipeline:
         self.executor = TaskExecutor(self.llm)
         self.comparator = Comparator(self.llm, workspace=self._workspace)
         self.patcher = Patcher(self.llm, workspace=self._workspace)
-        # Auditor uses a separate LLM instance for independence
         self.auditor = Auditor(create_llm(config.llm), workspace=self._workspace)
+        self.evaluator = self._create_evaluator()
+
+    def _create_evaluator(self) -> TaskEvaluator:
+        """Instantiate the configured TaskEvaluator."""
+        class_path = self.config.evolution.evaluator_class
+        if class_path is None:
+            return KeywordEvaluator()
+        cls = load_evaluator_class(class_path)
+        return cls()
 
     async def evolve(
         self,
@@ -180,11 +199,21 @@ class EvolutionPipeline:
                     skill_text=skill.full_text,
                     strategy=strat,
                 )
+                # Step 3: External evaluation (replaces self-assessment)
+                try:
+                    result = self.evaluator.evaluate(task, trajectory.response)
+                    trajectory.outcome = result.outcome
+                    trajectory.outcome_reason = result.reason
+                except Exception as exc:
+                    logger.warning("Evaluator failed for task %d strategy %s: %s", task_idx, strat.name, exc)
+                    trajectory.outcome = TaskOutcome.FAILURE
+                    trajectory.outcome_reason = f"Evaluator error: {exc}"
+
                 all_trajectories.append(trajectory)
                 icon = "✓" if trajectory.outcome == TaskOutcome.SUCCESS else "✗"
                 console.print(f"    [{strat.name}] {icon} {trajectory.outcome.value}")
 
-        # Step 3: Contrastive comparison
+        # Step 4: Contrastive comparison
         console.print("[dim]Comparing trajectories...[/dim]")
         signals = await self.comparator.compare(all_trajectories, skill.full_text)
         console.print(f"  Extracted {len(signals)} delta signals")
@@ -192,30 +221,41 @@ class EvolutionPipeline:
         for s in signals:
             console.print(f"    [{s.affects}] {s.category} (conf={s.confidence:.2f}): {s.description[:80]}")
 
-        # Step 4: Patch skill
+        # Step 5: Patch skill (on a deep copy — T3 fix for in-memory mutation)
         changelog = ""
         if signals:
             console.print("[dim]Applying patches...[/dim]")
-            updated_skill, changelog = await self.patcher.patch(skill, signals)
-            skill.body = updated_skill.body
-            skill.appendix = updated_skill.appendix
+            skill_snapshot = copy.deepcopy(skill)
+            updated_skill, changelog = await self.patcher.patch(skill_snapshot, signals)
             console.print(f"  Changes applied:\n{changelog[:500]}")
 
-        # Step 5: Independent audit
-        audit_passed = True
-        if self.config.audit.enabled:
-            console.print("[dim]Running independent audit...[/dim]")
-            audit_report = await self.auditor.audit(skill)
-            audit_passed = audit_report.passed
-            severity_color = "green" if audit_passed else "red"
-            console.print(
-                f"  Audit: [{severity_color}]{audit_report.overall.value}[/{severity_color}] "
-                f"— {audit_report.summary}"
-            )
+            # Step 6: Independent audit of the patched version
+            audit_passed = True
+            if self.config.audit.enabled:
+                console.print("[dim]Running independent audit...[/dim]")
+                audit_report = await self.auditor.audit(updated_skill)
+                audit_passed = audit_report.passed
+                severity_color = "green" if audit_passed else "red"
+                console.print(
+                    f"  Audit: [{severity_color}]{audit_report.overall.value}[/{severity_color}] "
+                    f"— {audit_report.summary}"
+                )
 
-            # If audit failed, convert findings to signals for next round
-            if not audit_passed:
-                console.print("  [yellow]Audit failed — findings will feed into next round[/yellow]")
+            if audit_passed:
+                skill.body = updated_skill.body
+                skill.appendix = updated_skill.appendix
+            else:
+                # Rollback: discard patched version, convert findings to DeltaSignals
+                console.print("  [yellow]Audit failed — rolling back patch, feeding findings as signals[/yellow]")
+                changelog = ""
+                audit_signals = self._audit_findings_to_signals(audit_report)
+                signals.extend(audit_signals)
+                logger.info(
+                    "Round %d audit failed: rolled back patch, generated %d feedback signals",
+                    round_num, len(audit_signals),
+                )
+        else:
+            audit_passed = True
 
         successes = sum(1 for t in all_trajectories if t.outcome == TaskOutcome.SUCCESS)
         return RoundReport(
@@ -229,6 +269,22 @@ class EvolutionPipeline:
             changelog=changelog,
             cost_estimate=self.llm.usage.estimated_cost_usd,
         )
+
+    @staticmethod
+    def _audit_findings_to_signals(report: AuditReport) -> list[DeltaSignal]:
+        """Convert audit findings into DeltaSignals for the next evolution round."""
+        signals = []
+        for finding in report.findings:
+            if finding.severity == AuditSeverity.PASS:
+                continue
+            signals.append(DeltaSignal(
+                category="wrong_approach" if finding.severity == AuditSeverity.FAIL else "edge_case",
+                description=f"Audit [{finding.check}]: {finding.description}",
+                evidence=finding.suggestion or "See audit finding",
+                confidence=0.9 if finding.severity == AuditSeverity.FAIL else 0.6,
+                affects="body",
+            ))
+        return signals
 
     def _over_budget(self) -> bool:
         """Check if we've exceeded the configured budget."""
