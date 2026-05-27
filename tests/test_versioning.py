@@ -133,3 +133,52 @@ class TestSkillVersionManager:
         v2_skill = vm.load_version(2)
         assert v2_skill is not None
         assert v2_skill.metadata.parent_hash == first_hash
+
+    def test_snapshot_with_scores(self, workspace: Path, skill: Skill):
+        vm = SkillVersionManager(workspace, "test-skill")
+        scores = {"case-1": 0.9, "case-2": 0.75}
+        vm.snapshot(skill, notes="scored", scores=scores)
+
+        retrieved = vm.get_scores(1)
+        assert retrieved == scores
+
+    def test_get_scores_empty_when_not_set(self, workspace: Path, skill: Skill):
+        vm = SkillVersionManager(workspace, "test-skill")
+        vm.snapshot(skill, notes="no scores")
+        assert vm.get_scores(1) == {}
+
+    def test_get_scores_nonexistent_version(self, workspace: Path, skill: Skill):
+        vm = SkillVersionManager(workspace, "test-skill")
+        assert vm.get_scores(99) == {}
+
+    def test_get_baseline_scores(self, workspace: Path, skill: Skill):
+        vm = SkillVersionManager(workspace, "test-skill")
+        vm.snapshot(skill, notes="v1", scores={"a": 0.5})
+        skill.body = "# Updated"
+        vm.snapshot(skill, notes="v2", scores={"a": 0.8, "b": 0.6})
+
+        baseline = vm.get_baseline_scores()
+        assert baseline == {"a": 0.8, "b": 0.6}
+
+    def test_get_baseline_scores_empty_history(self, workspace: Path):
+        vm = SkillVersionManager(workspace, "test-skill")
+        assert vm.get_baseline_scores() == {}
+
+    def test_update_scores(self, workspace: Path, skill: Skill):
+        vm = SkillVersionManager(workspace, "test-skill")
+        vm.snapshot(skill, notes="v1")
+
+        updated = vm.update_scores(1, {"x": 0.95})
+        assert updated is True
+        assert vm.get_scores(1) == {"x": 0.95}
+
+    def test_update_scores_nonexistent(self, workspace: Path, skill: Skill):
+        vm = SkillVersionManager(workspace, "test-skill")
+        assert vm.update_scores(99, {"x": 0.5}) is False
+
+    def test_scores_persist_across_reloads(self, workspace: Path, skill: Skill):
+        vm = SkillVersionManager(workspace, "test-skill")
+        vm.snapshot(skill, notes="v1", scores={"a": 0.7})
+
+        vm2 = SkillVersionManager(workspace, "test-skill")
+        assert vm2.get_scores(1) == {"a": 0.7}
