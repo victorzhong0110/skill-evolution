@@ -1,0 +1,11 @@
+# Code review test tasks — one per line
+
+Review this Python function for issues: `def get_user(id): return db.query(f"SELECT * FROM users WHERE id = {id}")`
+
+Review this JavaScript code: `app.get('/api/data', (req, res) => { const file = req.query.path; res.sendFile(file); })`
+
+Review this authentication logic: `def login(user, pwd): if hash(pwd) == user.password_hash: token = str(random.randint(0, 999999)); return token`
+
+Review this Python data processing: `def process(items): result = []; for i in items: for j in items: if i != j: result.append((i,j)); return result`
+
+Review this error handling pattern: `try: data = json.loads(request.body); process(data); return Response(200) except: return Response(500)`
