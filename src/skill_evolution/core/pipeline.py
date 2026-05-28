@@ -131,6 +131,16 @@ class EvolutionPipeline:
         ws = workspace or self.config.workspace_dir
         vm = SkillVersionManager(ws, skill.metadata.name)
 
+        # Warn if evolution model differs from skill's target model
+        if skill.metadata.target_model:
+            llm_name = getattr(self.llm, "model_name", "") or ""
+            if skill.metadata.target_model.lower() not in llm_name.lower():
+                console.print(
+                    f"[bold yellow]⚠ Model mismatch: skill target_model='{skill.metadata.target_model}' "
+                    f"but evolution LLM='{llm_name}'. "
+                    f"Scoring behaviors may diverge.[/bold yellow]"
+                )
+
         # Snapshot initial version
         vm.snapshot(skill, notes="Initial version before evolution")
         report = EvolutionReport(

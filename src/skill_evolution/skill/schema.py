@@ -22,6 +22,7 @@ class SkillMetadata(BaseModel):
     version: int = 0
     domain: str = "general"
     author: str = "skill-evolution"
+    target_model: str | None = None  # Model this skill is designed for (e.g., "deepseek", "claude")
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     evolved_at: str | None = None
     parent_hash: str | None = None  # Hash of the version this was evolved from
