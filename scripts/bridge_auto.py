@@ -15,7 +15,6 @@ Usage:
 from __future__ import annotations
 
 import json
-import re
 import sys
 import time
 from pathlib import Path
@@ -106,7 +105,7 @@ def main():
             user_len = len(user_content)
 
             print(f"[Bridge Auto] {req_id[:8]}... type={req_type} (sys={system_len}, usr={user_len})")
-            print(f"  → Needs Agent processing. Skipping (use bridge_monitor.py for manual processing).")
+            print("  → Needs Agent processing. Skipping (use bridge_monitor.py for manual processing).")
 
         if once:
             break
