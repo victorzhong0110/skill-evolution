@@ -1,5 +1,7 @@
 # skill-evolution
 
+[![CI](https://github.com/victorzhong0110/skill-evolution/actions/workflows/ci.yml/badge.svg)](https://github.com/victorzhong0110/skill-evolution/actions/workflows/ci.yml)
+
 > Evolve AI agent skills through iterative meta-skill-driven optimization.
 
 Inspired by [SkillEvolver](https://arxiv.org/abs/2605.10500) and [EmbodiSkill](https://arxiv.org/abs/2605.10332), `skill-evolution` is a framework-agnostic CLI tool that automatically improves AI agent skill documents through a principled evolution loop.
