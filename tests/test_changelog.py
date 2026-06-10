@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 from skill_evolution.core.changelog import (
     ChangelogEntry,
     append_changelog,

@@ -6,11 +6,11 @@ that generated the strategy), matching SkillEvolver's deployment-driven feedback
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 
 from skill_evolution.core.explorer import Strategy
-from skill_evolution.llm.base import LLMBackend, LLMResponse
+from skill_evolution.llm.base import LLMBackend
 
 
 class TaskOutcome(str, Enum):

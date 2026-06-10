@@ -24,7 +24,6 @@ from skill_evolution.config import Config
 from skill_evolution.core.changelog import ChangelogEntry, append_changelog
 from skill_evolution.core.pipeline import EvolutionPipeline
 from skill_evolution.llm import create_llm
-from skill_evolution.meta_skills.loader import load_meta_skill
 from skill_evolution.meta_skills.testing.loader import load_builtin_suite, load_test_suite
 from skill_evolution.meta_skills.testing.models import EvalCase
 from skill_evolution.meta_skills.testing.scoring import get_scorer, score_meta_skill
@@ -168,7 +167,7 @@ class MetaSkillEvolver:
         console.print(f"  Baseline mean: {_mean(baseline_scores):.2f}")
 
         # Snapshot baseline with scores
-        baseline_version = vm.snapshot(
+        vm.snapshot(
             skill, notes="Baseline before meta-evolution", scores=baseline_scores
         )
 

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import importlib
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
 from skill_evolution.runner.executor import TaskOutcome

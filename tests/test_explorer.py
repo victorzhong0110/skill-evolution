@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import pytest
-
-from skill_evolution.core.explorer import Explorer, Strategy
+from skill_evolution.core.explorer import Explorer
 
 
 class TestStrategyParsing:

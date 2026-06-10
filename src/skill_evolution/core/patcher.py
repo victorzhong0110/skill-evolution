@@ -13,7 +13,6 @@ from skill_evolution.llm.base import LLMBackend
 from skill_evolution.meta_skills.loader import load_meta_skill
 from skill_evolution.skill.schema import Skill
 
-
 _FALLBACK_PROMPT = """\
 You are a precision skill editor. You receive a skill document and a set of delta signals \
 (improvement instructions). Your job is to apply TARGETED, MINIMAL patches.

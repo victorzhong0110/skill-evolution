@@ -16,8 +16,7 @@ sys.path.insert(0, str(SCRIPTS_DIR))
 import bridge_auto_respond as bar  # noqa: E402
 
 sys.path.insert(0, str(ROOT / "src"))
-from skill_evolution.core.explorer import Explorer, Strategy  # noqa: E402
-
+from skill_evolution.core.explorer import Explorer  # noqa: E402
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 

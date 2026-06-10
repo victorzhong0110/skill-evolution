@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import pytest
-
-from skill_evolution.core.comparator import Comparator, DeltaSignal
+from skill_evolution.core.comparator import Comparator
 
 
 class TestSignalParsing:

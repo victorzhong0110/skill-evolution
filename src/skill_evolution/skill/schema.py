@@ -7,7 +7,6 @@ import logging
 import re
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
 
 import yaml
 from pydantic import BaseModel, Field

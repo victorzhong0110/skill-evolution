@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import pytest
-
-from skill_evolution.skill.regression_gate import GateVerdict, check_regression
+from skill_evolution.skill.regression_gate import check_regression
 
 
 class TestCheckRegression:

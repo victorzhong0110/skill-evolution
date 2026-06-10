@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from skill_evolution.config import Config
-from skill_evolution.core.meta_evolver import MetaSkillEvolver, MetaEvolveResult
+from skill_evolution.core.meta_evolver import MetaEvolveResult, MetaSkillEvolver
 from skill_evolution.skill.schema import Skill
 
 

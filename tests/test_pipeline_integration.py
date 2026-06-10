@@ -9,16 +9,14 @@ import asyncio
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
-
 from skill_evolution.config import Config
 from skill_evolution.core.auditor import Auditor
 from skill_evolution.core.comparator import Comparator
 from skill_evolution.core.explorer import Explorer
 from skill_evolution.core.patcher import Patcher
 from skill_evolution.core.pipeline import EvolutionPipeline, EvolutionReport, RoundReport
-from skill_evolution.evaluation.evaluator import EvalResult, KeywordEvaluator
-from skill_evolution.runner.executor import TaskExecutor, TaskOutcome
+from skill_evolution.evaluation.evaluator import KeywordEvaluator
+from skill_evolution.runner.executor import TaskExecutor, TaskOutcome, Trajectory
 from skill_evolution.skill.schema import Skill
 from tests.conftest import (
     AUDITOR_FAIL,
@@ -375,9 +373,8 @@ class TestExplorerIntegration:
 class TestComparatorIntegration:
     """Integration tests for Comparator async methods with mock LLM."""
 
-    def _make_trajectory(self, outcome: TaskOutcome, response: str = "test") -> "Trajectory":
+    def _make_trajectory(self, outcome: TaskOutcome, response: str = "test") -> Trajectory:
         from skill_evolution.core.explorer import Strategy
-        from skill_evolution.runner.executor import Trajectory
 
         return Trajectory(
             task_description="test task",

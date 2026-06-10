@@ -39,3 +39,9 @@ Thumbs.db
 # Environment
 .env
 .env.local
+
+# Claude Code agent worktrees (full repo copies, never commit)
+.claude/worktrees/
+
+# Private experiment workspace (contains personal CLAUDE.md content)
+evolve_claude/

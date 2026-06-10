@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from skill_evolution.runner.executor import TaskExecutor, TaskOutcome, Trajectory
 
 

@@ -4,10 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 from skill_evolution.meta_skills.loader import load_meta_skill
-
 
 FALLBACK = "hardcoded fallback prompt"
 

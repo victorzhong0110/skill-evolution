@@ -99,13 +99,14 @@ def evolve(
     skill = Skill.from_file(Path(skill_path))
     tasks = _load_tasks(tasks_path)
 
+    budget_label = f"${config.evolution.budget_usd}" if config.evolution.budget_usd else "unlimited"
     console.print(Panel(
         f"[bold]Skill:[/bold] {skill.metadata.name}\n"
         f"[bold]Tasks:[/bold] {len(tasks)}\n"
         f"[bold]Rounds:[/bold] {config.evolution.num_rounds}\n"
         f"[bold]Strategies/task:[/bold] {config.evolution.num_strategies}\n"
         f"[bold]Provider:[/bold] {config.llm.provider} ({config.llm.model})\n"
-        f"[bold]Budget:[/bold] {'$' + str(config.evolution.budget_usd) if config.evolution.budget_usd else 'unlimited'}",
+        f"[bold]Budget:[/bold] {budget_label}",
         title="skill-evolution",
         border_style="cyan",
     ))

@@ -5,7 +5,6 @@ from __future__ import annotations
 import pytest
 
 from skill_evolution.evaluation.evaluator import (
-    EvalResult,
     GroundTruthEvaluator,
     KeywordEvaluator,
     TaskEvaluator,

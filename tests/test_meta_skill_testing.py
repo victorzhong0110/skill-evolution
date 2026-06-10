@@ -7,6 +7,11 @@ from pathlib import Path
 
 import pytest
 
+from skill_evolution.meta_skills.testing.loader import (
+    list_builtin_suites,
+    load_builtin_suite,
+    load_test_suite,
+)
 from skill_evolution.meta_skills.testing.models import (
     EvalCase,
     ScoreResult,
@@ -14,18 +19,12 @@ from skill_evolution.meta_skills.testing.models import (
     read_cases_jsonl,
     write_cases_jsonl,
 )
-from skill_evolution.meta_skills.testing.loader import (
-    list_builtin_suites,
-    load_builtin_suite,
-    load_test_suite,
-)
 from skill_evolution.meta_skills.testing.scoring import (
     StrategyGenerationScorer,
     TrajectoryComparisonScorer,
     get_scorer,
     score_meta_skill,
 )
-
 
 # ── T7a: Models ──────────────────────────────────────────────────────
 
