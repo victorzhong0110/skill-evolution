@@ -13,31 +13,25 @@ This loops for R rounds or until budget is exhausted.
 
 from __future__ import annotations
 
-import asyncio
 import copy
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from pathlib import Path
-from typing import Callable
 
 from rich.console import Console
-from rich.panel import Panel
-from rich.table import Table
 
 from skill_evolution.config import Config
 from skill_evolution.core.auditor import Auditor, AuditReport, AuditSeverity
 from skill_evolution.core.comparator import Comparator, DeltaSignal
 from skill_evolution.core.explorer import Explorer
 from skill_evolution.core.patcher import Patcher
+from skill_evolution.core.prompt_safety import ensure_prompt_safe
 from skill_evolution.evaluation.evaluator import (
-    EvalResult,
     KeywordEvaluator,
     TaskEvaluator,
     load_evaluator_class,
 )
 from skill_evolution.llm import create_llm
-from skill_evolution.llm.base import LLMBackend
 from skill_evolution.runner.executor import TaskExecutor, TaskOutcome, Trajectory
 from skill_evolution.skill.schema import Skill
 from skill_evolution.skill.versioning import SkillVersionManager
@@ -128,12 +122,19 @@ class EvolutionPipeline:
         Returns:
             (evolved_skill, evolution_report)
         """
+        # Boundary validation: inputs containing reserved ===TOKEN=== delimiters
+        # would corrupt section parsing downstream (prompt-injection surface).
+        ensure_prompt_safe(skill.body, source="skill body")
+        ensure_prompt_safe(skill.appendix, source="skill appendix")
+        for idx, task in enumerate(tasks):
+            ensure_prompt_safe(task, source=f"tasks[{idx}]")
+
         ws = workspace or self.config.workspace_dir
         vm = SkillVersionManager(ws, skill.metadata.name)
 
         # Warn if evolution model differs from skill's target model
         if skill.metadata.target_model:
-            llm_name = getattr(self.llm, "model_name", "") or ""
+            llm_name = getattr(self.llm, "model", "") or ""
             if skill.metadata.target_model.lower() not in llm_name.lower():
                 console.print(
                     f"[bold yellow]⚠ Model mismatch: skill target_model='{skill.metadata.target_model}' "
@@ -175,7 +176,7 @@ class EvolutionPipeline:
         report.final_hash = current_skill.content_hash
         report.total_cost = self.llm.usage.estimated_cost_usd
 
-        console.print(f"\n[bold green]Evolution complete![/bold green]")
+        console.print("\n[bold green]Evolution complete![/bold green]")
         console.print(self.llm.usage.summary())
 
         return current_skill, report
