@@ -49,10 +49,31 @@ Key design principles:
 ### Install
 
 ```bash
-pip install -e .
+pip install git+https://github.com/victorzhong0110/skill-evolution.git
 ```
 
-### Evolve a skill
+Or for development:
+
+```bash
+git clone https://github.com/victorzhong0110/skill-evolution.git
+cd skill-evolution && pip install -e ".[dev]"
+```
+
+### Zero-API-key quickstart (Claude Code users)
+
+If you have the [`claude` CLI](https://claude.com/claude-code) installed, no API
+key is needed — the `cli` provider reuses your existing Claude Code
+authentication. Try evolving a CLAUDE.md-style guidance file:
+
+```bash
+skill-evolution evolve examples/claude_md/skill.md examples/claude_md/tasks.txt \
+  --provider cli --rounds 1 --strategies 2
+```
+
+See [examples/claude_md/](examples/claude_md/) for the walkthrough, including
+how to point this at your own project's `CLAUDE.md`.
+
+### Evolve a skill (API providers)
 
 ```bash
 # Set your API key
@@ -138,7 +159,7 @@ Generate a config file with `skill-evolution init`, then edit `skill-evolution.y
 
 ```yaml
 llm:
-  provider: claude          # claude | openai
+  provider: claude          # claude | openai | cli | bridge
   model: claude-sonnet-4-20250514
   temperature: 0.7
 evolution:

@@ -1,0 +1,8 @@
+# Tasks that exercise the guidance — realistic requests a coding assistant gets daily.
+# Evolution rewards guidance that makes responses handle edge cases, errors, and tests.
+
+Add a function that parses ISO-8601 date strings from user input, including how invalid input should be handled.
+
+Fix this bug and explain the fix: `def avg(xs): return sum(xs) / len(xs)` crashes when xs is empty.
+
+Add a --verbose flag to an argparse-based CLI script, and update its usage documentation.
