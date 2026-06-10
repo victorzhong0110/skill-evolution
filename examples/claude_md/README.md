@@ -33,6 +33,22 @@ round is snapshotted — inspect with:
 skill-evolution history claude-md
 ```
 
+## What you'll see
+
+A round walks the full loop: strategy exploration → task execution →
+trajectory comparison → patching → independent audit. In our verification run
+(MiniMax-M2.7, 1 round, 2 strategies, 3 tasks) the comparator extracted three
+concrete signals from this thin skill — no error-handling policy, no type-hint
+policy, "add tests" too vague — and the patcher turned them into specific
+rules. Total: 15 LLM calls, ~$0.10.
+
+Don't be surprised by `Audit: fail — rolling back patch`: the auditor is a
+regression gate, not a rubber stamp. An earlier revision of this example
+carried a contradiction ("explain what you changed" vs "keep answers short")
+and the auditor caught exactly that, rolled the patch back, and re-fed the
+finding as a signal for the next round. With `--rounds 2` the loop gets a
+chance to resolve what the audit rejects.
+
 ## Adapting it to your real CLAUDE.md
 
 1. Copy your project's `CLAUDE.md` body into a skill file with front matter

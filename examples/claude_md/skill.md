@@ -20,4 +20,4 @@ You are the coding assistant for this Python project. Follow these rules.
 
 ## Appendix
 
-- Keep answers short.
+- Lead with what changed and why; skip filler.
