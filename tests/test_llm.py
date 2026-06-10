@@ -74,10 +74,17 @@ class TestFactory:
         backend = create_llm(cfg)
         assert backend.__class__.__name__ == "ClaudeBackend"
 
-    def test_create_openai_backend(self):
+    def test_create_openai_backend(self, monkeypatch):
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-test-key")
         cfg = LLMConfig(provider="openai", model="gpt-4o")
         backend = create_llm(cfg)
         assert backend.__class__.__name__ == "OpenAIBackend"
+
+    def test_openai_backend_requires_key(self, monkeypatch):
+        monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+        cfg = LLMConfig(provider="openai", model="gpt-4o")
+        with pytest.raises(ValueError, match="API key"):
+            create_llm(cfg)
 
     def test_create_cli_backend(self):
         cfg = LLMConfig(provider="cli", model="claude-sonnet-4-20250514")

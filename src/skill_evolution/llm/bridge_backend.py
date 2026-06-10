@@ -19,6 +19,7 @@ Cost savings vs `claude -p`:
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import time
@@ -102,7 +103,7 @@ class BridgeBackend(LLMBackend):
                     f"response to request {request_id[:8]}. "
                     f"Is the Claude Code monitor running?"
                 )
-            time.sleep(_POLL_INTERVAL)
+            await asyncio.sleep(_POLL_INTERVAL)  # non-blocking: keep the event loop free
 
         # Read response
         try:

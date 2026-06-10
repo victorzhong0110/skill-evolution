@@ -20,8 +20,14 @@ class OpenAIBackend(LLMBackend):
     ):
         super().__init__(model=model)
         self.model = model
+        resolved_key = api_key or os.environ.get("OPENAI_API_KEY")
+        if not resolved_key:
+            raise ValueError(
+                "OpenAIBackend requires an API key: pass api_key or set OPENAI_API_KEY. "
+                "Failing at init so misconfiguration surfaces before any LLM spend."
+            )
         self.client = AsyncOpenAI(
-            api_key=api_key or os.environ.get("OPENAI_API_KEY", "sk-placeholder"),
+            api_key=resolved_key,
             base_url=base_url,
         )
 
