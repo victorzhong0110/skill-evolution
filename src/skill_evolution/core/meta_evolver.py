@@ -99,7 +99,7 @@ class MetaSkillEvolver:
             scores[case.id] = result.score
         return scores
 
-    def run_test_suite(
+    async def run_test_suite(
         self,
         name: str,
         skill_text: str,
@@ -107,33 +107,26 @@ class MetaSkillEvolver:
     ) -> dict[str, float]:
         """Score a meta-skill's text against its test suite.
 
-        This produces output by running the meta-skill text through
-        the LLM, then scoring the result structurally.
-
-        Safe to call from both sync and async contexts.
+        Runs every test case through the LLM concurrently
+        (``asyncio.gather``), then scores the results structurally.
         """
         cases = self._load_test_cases(name, suite_path)
         llm = create_llm(self.config.llm)
 
-        def output_fn(case: EvalCase) -> str:
-            try:
-                loop = asyncio.get_running_loop()
-            except RuntimeError:
-                loop = None
-
-            coro = llm.ask(
+        async def case_output(case: EvalCase) -> str:
+            response = await llm.ask(
                 prompt=self._build_test_prompt(name, case),
                 system=skill_text,
                 temperature=0.5,
             )
-            if loop and loop.is_running():
-                import concurrent.futures
-                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-                    future = pool.submit(asyncio.run, coro)
-                    return future.result(timeout=600).content
-            return asyncio.run(coro).content
+            return response.content
 
-        suite_result = score_meta_skill(name, cases, output_fn)
+        outputs = await asyncio.gather(*(case_output(case) for case in cases))
+        outputs_by_id = {case.id: output for case, output in zip(cases, outputs)}
+
+        suite_result = score_meta_skill(
+            name, cases, lambda case: outputs_by_id[case.id]
+        )
         return {r.case_id: r.score for r in suite_result.results}
 
     async def evolve(
@@ -163,7 +156,7 @@ class MetaSkillEvolver:
 
         # 2. Score baseline
         console.print("[dim]Scoring baseline...[/dim]")
-        baseline_scores = self.run_test_suite(target, skill.full_text, suite_path)
+        baseline_scores = await self.run_test_suite(target, skill.full_text, suite_path)
         console.print(f"  Baseline mean: {_mean(baseline_scores):.2f}")
 
         # Snapshot baseline with scores
@@ -182,7 +175,7 @@ class MetaSkillEvolver:
 
         # 4. Score candidate
         console.print("[dim]Scoring candidate...[/dim]")
-        candidate_scores = self.run_test_suite(
+        candidate_scores = await self.run_test_suite(
             target, candidate_skill.full_text, suite_path
         )
         console.print(f"  Candidate mean: {_mean(candidate_scores):.2f}")

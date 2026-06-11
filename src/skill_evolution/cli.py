@@ -394,7 +394,7 @@ def meta_test(
 
     skill = evolver._load_meta_skill_as_skill(target)
     suite_path = Path(suite) if suite else None
-    scores = evolver.run_test_suite(target, skill.full_text, suite_path)
+    scores = asyncio.run(evolver.run_test_suite(target, skill.full_text, suite_path))
 
     table = Table(title=f"Meta-Test: {target}")
     table.add_column("Case", style="bold")
