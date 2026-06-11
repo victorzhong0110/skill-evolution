@@ -49,7 +49,7 @@ Key design principles:
 ### Install
 
 ```bash
-pip install git+https://github.com/victorzhong0110/skill-evolution.git
+pip install skill-evolution
 ```
 
 Or for development:
