@@ -1,6 +1,9 @@
 # skill-evolution
 
 [![CI](https://github.com/victorzhong0110/skill-evolution/actions/workflows/ci.yml/badge.svg)](https://github.com/victorzhong0110/skill-evolution/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/skill-evolution)](https://pypi.org/project/skill-evolution/)
+[![Python](https://img.shields.io/pypi/pyversions/skill-evolution)](https://pypi.org/project/skill-evolution/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 > Evolve AI agent skills through iterative meta-skill-driven optimization.
 
