@@ -1,0 +1,21 @@
+{
+  "train": [
+    {
+      "id": "climbing-gym",
+      "prompt": "Write a design plan (not full code) for a climbing-gym class booking page. Include a named palette with hex values, type pairing, ASCII wireframe, and one signature element. State the subject, audience, and the page's single job.",
+      "required": ["palette", "hex", "signature", "audience"]
+    },
+    {
+      "id": "record-shop",
+      "prompt": "Write a design plan for an independent record shop's used-vinyl listing page. Ground tokens in the subject. Include palette hex values, display vs body typefaces, and a signature the page will be remembered by.",
+      "required": ["palette", "hex", "typeface", "signature"]
+    }
+  ],
+  "held_out": [
+    {
+      "id": "community-radio",
+      "prompt": "Write a design plan for a community radio station's live-show schedule. Avoid cream/terracotta, black/acid-green, and broadsheet-as-decoration defaults unless you justify them from the brief. Include palette hex values and a signature.",
+      "required": ["palette", "hex", "signature", "schedule"]
+    }
+  ]
+}

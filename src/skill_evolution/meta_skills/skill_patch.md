@@ -63,12 +63,20 @@ How: Add a clear, prominent reminder in the appendix section.
 Rule: Appendix items should be short, specific, and scannable.
       They exist because agents tend to skip these particular rules.
 
-### Optimize
-When: `efficiency` signal
-How: Streamline verbose instructions, merge redundant sections,
-     replace multi-step procedures with concise alternatives.
-Rule: Only optimize if the meaning is fully preserved.
-      When in doubt, keep the verbose version.
+### Delete Knowledge
+When: `redundancy` signal, or a rule is instance-specific / contradictory / unused
+How: Remove the paragraph or demote it to appendix if it is still a useful reminder.
+Rule: Deletion is a first-class edit. Prefer DELETE over leaving dead weight.
+      Record the removal in the changelog as DELETE.
+
+### Demote to Appendix
+When: a body rule is correct but noisy, or an execution-lapse signal does not
+      deserve a new body section
+How: Move the rule to appendix as a short imperative reminder.
+Rule: Tag the changelog line DEMOTE.
+
+5. **Shrinkage**: Prefer DELETE/DEMOTE for redundancy. Never grow the skill
+   without a matching deletion when signals include unused or contradictory rules.
 
 ## Quality Checks Before Outputting
 
@@ -83,5 +91,6 @@ Before producing the final patched skill:
 - Rewriting the entire skill when only a paragraph needs to change
 - Adding appendix reminders for body-level issues (treating symptoms not causes)
 - Making the skill longer without making it better (word count is not quality)
+- Refusing to delete unused or contradictory content
 - Removing useful content because it "wasn't in the signals"
 - Over-qualifying every rule with exceptions until it becomes meaningless

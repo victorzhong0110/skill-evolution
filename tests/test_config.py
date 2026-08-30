@@ -30,6 +30,7 @@ class TestEvolutionConfig:
         assert cfg.num_rounds == 2
         assert cfg.budget_usd is None
         assert cfg.auto_snapshot is True
+        assert cfg.held_out_gate is True
 
     def test_validation_bounds(self):
         with pytest.raises(Exception):
@@ -75,4 +76,6 @@ class TestConfig:
         cfg = AuditConfig()
         assert "overfitting" in cfg.checks
         assert "hardcoding" in cfg.checks
-        assert len(cfg.checks) == 5
+        assert len(cfg.checks) == 7
+        assert "provenance" in cfg.checks
+        assert "shrinkage" in cfg.checks

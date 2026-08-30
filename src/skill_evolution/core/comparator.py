@@ -37,6 +37,7 @@ For each signal, classify it:
 - wrong_approach: The skill recommends an approach that doesn't work
 - edge_case: The skill doesn't handle a specific scenario
 - efficiency: The skill works but is wasteful (too many steps, too verbose)
+- redundancy: The skill contains unused, contradictory, or instance-specific content that should be deleted or demoted
 
 Also classify WHERE the fix should go (inspired by EmbodiSkill):
 - body: The core skill content needs to change (skill defect)

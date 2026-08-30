@@ -69,6 +69,18 @@ class TestLLMResponse:
 
 
 class TestFactory:
+    @pytest.fixture(autouse=True)
+    def _no_socks_proxy(self, monkeypatch):
+        for key in (
+            "ALL_PROXY",
+            "all_proxy",
+            "HTTP_PROXY",
+            "HTTPS_PROXY",
+            "http_proxy",
+            "https_proxy",
+        ):
+            monkeypatch.delenv(key, raising=False)
+
     def test_create_claude_backend(self):
         cfg = LLMConfig(provider="claude", model="claude-sonnet-4-20250514")
         backend = create_llm(cfg)

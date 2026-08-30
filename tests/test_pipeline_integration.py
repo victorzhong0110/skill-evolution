@@ -9,13 +9,16 @@ import asyncio
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 from skill_evolution.config import Config
 from skill_evolution.core.auditor import Auditor
 from skill_evolution.core.comparator import Comparator
 from skill_evolution.core.explorer import Explorer
 from skill_evolution.core.patcher import Patcher
 from skill_evolution.core.pipeline import EvolutionPipeline, EvolutionReport, RoundReport
-from skill_evolution.evaluation.evaluator import KeywordEvaluator
+from skill_evolution.evaluation.evaluator import KeywordEvaluator, UnconfiguredEvaluatorError
+from skill_evolution.evaluation.tasks import TaskSpec
 from skill_evolution.runner.executor import TaskExecutor, TaskOutcome, Trajectory
 from skill_evolution.skill.schema import Skill
 from tests.conftest import (
@@ -57,7 +60,7 @@ def _build_pipeline(
     pipeline.comparator = Comparator(llm, workspace=tmp_path)
     pipeline.patcher = Patcher(llm, workspace=tmp_path)
     pipeline.auditor = Auditor(MockLLM(responder=responder, default="default mock"), workspace=tmp_path)
-    pipeline.evaluator = KeywordEvaluator()
+    pipeline.evaluator = KeywordEvaluator(required=["executed"])
     return pipeline
 
 
@@ -155,7 +158,7 @@ class TestPipelineNoSignals:
                 return make_explorer_response(2)
             if "compare" in system.lower() or "delta signal" in system.lower():
                 return COMPARATOR_NO_SIGNALS
-            return "Executed task successfully"
+            return "Executed task successfully ===SKILL_USED=== yes"
 
         pipeline = _build_pipeline(tmp_path, responder=responder, audit_enabled=False)
         skill = _make_skill()
@@ -183,7 +186,7 @@ class TestPipelineWithSignals:
                 return AUDITOR_PASS
             if "compare" in system.lower() or "delta signal" in system.lower():
                 return COMPARATOR_ONE_SIGNAL
-            return "Executed task successfully"
+            return "Executed task successfully ===SKILL_USED=== yes"
 
         pipeline = _build_pipeline(tmp_path, responder=responder, audit_enabled=True)
         skill = _make_skill()
@@ -208,7 +211,7 @@ class TestPipelineWithSignals:
                 return AUDITOR_FAIL
             if "compare" in system.lower() or "delta signal" in system.lower():
                 return COMPARATOR_ONE_SIGNAL
-            return "Executed task successfully"
+            return "Executed task successfully ===SKILL_USED=== yes"
 
         pipeline = _build_pipeline(tmp_path, responder=responder, audit_enabled=True)
         skill = _make_skill()
@@ -249,7 +252,7 @@ class TestPipelineMultipleRounds:
         pipeline.comparator = Comparator(llm, workspace=tmp_path)
         pipeline.patcher = Patcher(llm, workspace=tmp_path)
         pipeline.auditor = Auditor(MockLLM(responder=responder), workspace=tmp_path)
-        pipeline.evaluator = KeywordEvaluator()
+        pipeline.evaluator = KeywordEvaluator(required=["executed"])
 
         skill = _make_skill()
         result_skill, report = asyncio.run(
@@ -282,7 +285,7 @@ class TestPipelineMultipleRounds:
         pipeline.comparator = Comparator(llm, workspace=tmp_path)
         pipeline.patcher = Patcher(llm, workspace=tmp_path)
         pipeline.auditor = Auditor(MockLLM(responder=responder), workspace=tmp_path)
-        pipeline.evaluator = KeywordEvaluator()
+        pipeline.evaluator = KeywordEvaluator(required=["executed"])
 
         skill = _make_skill()
         _, report = asyncio.run(
@@ -467,3 +470,58 @@ class TestAuditorIntegration:
         skill = _make_skill()
         report = asyncio.run(auditor.audit(skill))
         assert report.passed is False
+
+
+class TestUnconfiguredEvaluator:
+    def test_empty_keyword_evaluator_refused(self, tmp_path: Path):
+        pipeline = _build_pipeline(tmp_path, audit_enabled=False)
+        pipeline.evaluator = KeywordEvaluator()
+        with pytest.raises(UnconfiguredEvaluatorError, match="Refusing to evolve"):
+            asyncio.run(pipeline.evolve(_make_skill(), ["do a thing"]))
+
+    def test_task_criteria_allow_empty_fallback(self, tmp_path: Path):
+        def responder(system: str, prompt: str) -> str:
+            if "diverse strategies" in prompt.lower() or "generate exactly" in prompt.lower():
+                return make_explorer_response(2)
+            if "compare" in system.lower() or "delta signal" in system.lower():
+                return COMPARATOR_NO_SIGNALS
+            return "Files by Extension | Total Files 3 ===SKILL_USED=== yes"
+
+        pipeline = _build_pipeline(tmp_path, responder=responder, audit_enabled=False)
+        pipeline.evaluator = KeywordEvaluator()
+        tasks = [
+            TaskSpec(id="t1", prompt="Count files", required=["Files by Extension", "Total Files"]),
+        ]
+        _, report = asyncio.run(pipeline.evolve(_make_skill(), tasks))
+        assert report.rounds[0].trajectories_success == 2
+
+
+class TestHeldOutGate:
+    def test_held_out_regression_rolls_back(self, tmp_path: Path):
+        def responder(system: str, prompt: str) -> str:
+            if "diverse strategies" in prompt.lower() or "generate exactly" in prompt.lower():
+                return make_explorer_response(2)
+            if "delta signals to apply" in prompt.lower():
+                return PATCHER_RESPONSE
+            if "audit this skill" in prompt.lower():
+                return AUDITOR_PASS
+            if "compare" in system.lower() or "delta signal" in system.lower():
+                return COMPARATOR_ONE_SIGNAL
+            if "follow-skill" in system.lower() or "Follow the skill as written" in system:
+                if "error handling" in system.lower():
+                    return "Executed without the held-out marker"
+                return "HELD_OUT_OK executed ===SKILL_USED=== yes"
+            return "Executed task successfully ===SKILL_USED=== yes"
+
+        pipeline = _build_pipeline(tmp_path, responder=responder, audit_enabled=True)
+        pipeline.config.evolution.held_out_gate = True
+        original = _make_skill()
+        original_hash = original.content_hash
+        tasks = [
+            TaskSpec(id="train-1", prompt="Add logging", split="train", required=["executed"]),
+            TaskSpec(id="held-1", prompt="Held-out check", split="held_out", required=["HELD_OUT_OK"]),
+        ]
+        result, report = asyncio.run(pipeline.evolve(original, tasks))
+        assert result.content_hash == original_hash
+        assert report.rounds[0].held_out_passed is False
+        assert report.rounds[0].changelog == ""

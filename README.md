@@ -5,9 +5,14 @@
 [![Python](https://img.shields.io/pypi/pyversions/skill-evolution)](https://pypi.org/project/skill-evolution/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-> Evolve AI agent skills through iterative meta-skill-driven optimization.
+> Evolve Agent Skills (`SKILL.md`) through a contrastive loop with a held-out gate.
 
-Inspired by [SkillEvolver](https://arxiv.org/abs/2605.10500) and [EmbodiSkill](https://arxiv.org/abs/2605.10332), `skill-evolution` is a framework-agnostic CLI tool that automatically improves AI agent skill documents through a principled evolution loop.
+Portable CLI for improving **your** skill tonight — not a SkillOpt-scale trainer.
+Inspired by [SkillEvolver](https://arxiv.org/abs/2605.10500) and
+[EmbodiSkill](https://arxiv.org/abs/2605.10332). The 0.2 loop also takes the
+validation gate from [SkillOpt](https://arxiv.org/abs/2605.23904), first-class
+DELETE/DEMOTE from [SkillProx](https://arxiv.org/abs/2608.07449), and the
+[Agent Skills](https://agentskills.io/specification) directory format.
 
 ## How It Works
 
@@ -21,19 +26,23 @@ Inspired by [SkillEvolver](https://arxiv.org/abs/2605.10500) and [EmbodiSkill](h
     └────────────┬────────────┘
                  │
     ┌────────────▼────────────┐
-    │  2. Task Executor        │  Run each strategy independently
+    │  2. Task Executor        │  Run each strategy; optional scripts/
     └────────────┬────────────┘
                  │
     ┌────────────▼────────────┐
-    │  3. Trajectory Comparator│  Compare success vs failure → delta signals
+    │  3. External Evaluator   │  Task keywords / patterns (no self-grade)
     └────────────┬────────────┘
                  │
     ┌────────────▼────────────┐
-    │  4. Skill Patcher        │  Apply targeted patches (not rewrites)
+    │  4. Trajectory Comparator│  Success vs failure → delta signals
     └────────────┬────────────┘
                  │
     ┌────────────▼────────────┐
-    │  5. Independent Auditor  │  Check for overfitting, hardcoding, etc.
+    │  5. Skill Patcher        │  ADD / REFINE / DEMOTE / DELETE
+    └────────────┬────────────┘
+                 │
+    ┌────────────▼────────────┐
+    │  6. Auditor + held-out   │  SkillJack provenance, shrinkage, gate
     └────────────┬────────────┘
                  │
           ┌──────▼───────┐
@@ -42,10 +51,12 @@ Inspired by [SkillEvolver](https://arxiv.org/abs/2605.10500) and [EmbodiSkill](h
 ```
 
 Key design principles:
-- **Contrastive updates**: improvement signals come from comparing successful vs failed trajectories, not from self-reflection
-- **Targeted patching**: only modify what signals indicate — preserve everything else
-- **Skill-aware attribution**: distinguish skill defects (fix the body) from execution lapses (reinforce in appendix)
-- **Independent audit**: a separate LLM instance reviews evolved skills for overfitting
+
+- **Contrastive updates**: signals come from successful vs failed trajectories
+- **Scorable tasks**: an empty `KeywordEvaluator` is refused (it would mark every run SUCCESS)
+- **Held-out gate**: train patches that drop held-out scores are rolled back (SkillOpt)
+- **Shrinkage**: DELETE/DEMOTE are first-class; growth-only patches are a defect (SkillProx)
+- **Independent audit**: overfitting, silent bypass, provenance / SkillJack
 
 ## Quick Start
 
@@ -62,56 +73,47 @@ git clone https://github.com/victorzhong0110/skill-evolution.git
 cd skill-evolution && pip install -e ".[dev]"
 ```
 
-### Zero-API-key quickstart (Claude Code users)
+### Evolve a public-format skill (recommended)
 
-If you have the [`claude` CLI](https://claude.com/claude-code) installed, no API
-key is needed — the `cli` provider reuses your existing Claude Code
-authentication. Try evolving a CLAUDE.md-style guidance file:
+Flagship example is adapted from [alibaba/skill-up](https://github.com/alibaba/skill-up)
+`code-stats` (Apache-2.0): a real Agent Skills directory with `SKILL.md`,
+`scripts/`, and train / held-out tasks.
 
 ```bash
-skill-evolution evolve examples/claude_md/skill.md examples/claude_md/tasks.txt \
+# Claude Code CLI auth — no API key
+skill-evolution evolve examples/code-stats examples/code-stats/tasks.json \
   --provider cli --rounds 1 --strategies 2
+
+# Or Anthropic API
+export ANTHROPIC_API_KEY=sk-...
+skill-evolution evolve examples/code-stats examples/code-stats/tasks.json \
+  --provider claude --model claude-sonnet-4-6 --rounds 1 --strategies 2
 ```
 
-See [examples/claude_md/](examples/claude_md/) for the walkthrough, including
-how to point this at your own project's `CLAUDE.md`.
-
-### Evolve a skill (API providers)
+Second example, original spec-shaped design skill (not a copy of Anthropic's
+proprietary `frontend-design` body):
 
 ```bash
-# Set your API key
-export ANTHROPIC_API_KEY=sk-...
-# or for OpenAI:
-# export OPENAI_API_KEY=sk-...
-
-# Run evolution (2 rounds, 4 strategies per task)
-skill-evolution evolve examples/code_review/skill.md examples/code_review/tasks.txt
-
-# With options
-skill-evolution evolve examples/code_review/skill.md examples/code_review/tasks.txt \
-  --rounds 3 \
-  --strategies 4 \
-  --budget 5.0 \
-  --provider claude \
-  --model claude-sonnet-4-20250514
+skill-evolution evolve examples/frontend-design examples/frontend-design/tasks.json \
+  --provider cli --rounds 1 --strategies 2
 ```
 
 ### Audit a skill
 
 ```bash
-skill-evolution audit my-skill.md
+skill-evolution audit examples/code-stats
 ```
 
 ### View version history
 
 ```bash
-skill-evolution history code-review --workspace .skill-evolution
+skill-evolution history code-stats --workspace .skill-evolution
 ```
 
 ### Rollback
 
 ```bash
-skill-evolution rollback code-review 2 --workspace .skill-evolution
+skill-evolution rollback code-stats 2 --workspace .skill-evolution
 ```
 
 ### Generate default config
@@ -122,14 +124,22 @@ skill-evolution init
 
 ## Skill Format
 
-Skills are Markdown files with YAML front matter:
+Skills are an [Agent Skills](https://agentskills.io/specification) directory
+or a single Markdown file. Directories are preferred:
+
+```
+my-skill/
+├── SKILL.md          # required: YAML name + description, then instructions
+├── scripts/          # optional; executor may run these under scripts/
+├── references/       # optional; loaded on demand
+└── assets/
+```
 
 ```markdown
 ---
 name: my-skill
-version: 0
-domain: engineering
-tags: [example]
+description: What it does and when to trigger it. Both belong here.
+license: MIT
 ---
 
 # Skill Body
@@ -141,20 +151,37 @@ Core rules and knowledge go here.
 Reinforcement reminders for rules agents tend to skip.
 ```
 
+`name` should be lowercase digits and single hyphens. `description` is required
+by the spec and is the trigger text hosts show to the model.
+
+Passing a directory (or `SKILL.md`) writes `name.evolved/` beside it. Passing a
+`.md` file writes `*.evolved.md`.
+
 ## Task Format
 
-Tasks are plain text files, one task per line:
-
-```
-Review this code for SQL injection vulnerabilities: `query = f"SELECT * FROM users WHERE id = {user_id}"`
-Analyze this function for performance issues: `def find(items): return [x for x in items if x in other_list]`
-```
-
-Or JSON arrays:
+Plain text still works for prompts, but **evolution needs scoring criteria**.
+Use JSON with `required` / `forbidden` / `expected_patterns`, and a held-out
+split so the gate can reject overfit patches:
 
 ```json
-["Task 1 description", "Task 2 description"]
+{
+  "train": [
+    {"id": "t1", "prompt": "Analyze ./src", "required": ["Files by Extension", "Total Files"]}
+  ],
+  "held_out": [
+    {"id": "h1", "prompt": "Analyze ./tests", "required": ["Largest Files", "Total Lines"]}
+  ]
+}
 ```
+
+Also accepted:
+
+- JSON array of strings (all train; still needs a configured evaluator)
+- skill-creator `{ "evals": [ { "prompt", "expectations": [...] } ] }` — last third held-out
+- YAML with the same shapes
+
+Without criteria on tasks **and** without a configured evaluator, `evolve`
+exits with code 2.
 
 ## Configuration
 
@@ -163,15 +190,25 @@ Generate a config file with `skill-evolution init`, then edit `skill-evolution.y
 ```yaml
 llm:
   provider: claude          # claude | openai | cli | bridge
-  model: claude-sonnet-4-20250514
+  model: claude-sonnet-4-6
   temperature: 0.7
 evolution:
   num_strategies: 4         # K: strategies per task per round
   num_rounds: 2             # R: evolution rounds
   budget_usd: 10.0          # Max spend (null = unlimited)
+  held_out_gate: true       # Roll back patches that drop held-out scores
+  gate_tolerance: 0.0
   auto_snapshot: true
 audit:
   enabled: true
+  checks:
+    - overfitting
+    - hardcoding
+    - silent_bypass
+    - consistency
+    - generalizability
+    - provenance
+    - shrinkage
 workspace_dir: .skill-evolution
 ```
 
@@ -182,15 +219,16 @@ src/skill_evolution/
 ├── cli.py              # CLI commands (evolve, audit, history, rollback, init)
 ├── config.py           # YAML configuration
 ├── llm/                # LLM abstraction (Claude + OpenAI compatible)
-├── skill/              # Skill schema + version management
+├── skill/              # Skill schema + version management + regression gate
+├── evaluation/         # Task specs, KeywordEvaluator, PerTaskEvaluator
 ├── core/               # Evolution engine
 │   ├── explorer.py     # Strategy diversification
 │   ├── comparator.py   # Contrastive trajectory analysis
-│   ├── patcher.py      # Targeted skill patching
+│   ├── patcher.py      # ADD / REFINE / DEMOTE / DELETE
 │   ├── auditor.py      # Independent quality audit
 │   └── pipeline.py     # Orchestrates the full loop
-├── runner/             # Task execution
-│   └── executor.py     # Independent agent execution
+├── runner/             # Task execution + scripts/ sandbox
+│   └── executor.py
 └── meta_skills/        # Built-in meta-skills (themselves evolvable)
     ├── strategy_generation.md
     ├── trajectory_comparison.md
@@ -203,7 +241,6 @@ src/skill_evolution/
 The four meta-skills in `meta_skills/` drive the evolution process itself. They can be evolved using the same pipeline — making the system self-improving:
 
 ```bash
-# Evolve the strategy generation meta-skill using its own pipeline
 skill-evolution evolve src/skill_evolution/meta_skills/strategy_generation.md meta_skill_tasks.txt
 ```
 
@@ -221,11 +258,47 @@ If you use this tool in research, please cite the papers that inspired it:
 
 @article{embodiskill2026,
   title={EmbodiSkill: Skill-Aware Reflection for Self-Evolving Embodied Agents},
-  author={...},
+  author={Ju, Ruofei and Wang, Xinrui and Ding, Xin and Yang, Yifan and Wu, Hao
+          and Jiang, Shiqi and Zhang, Qianxi and Wen, Hao and Li, Xiangyu
+          and Wang, Weijun and Li, Kun and Liu, Yunxin and Dai, Haipeng
+          and Wang, Wei and Cao, Ting},
   journal={arXiv preprint arXiv:2605.10332},
   year={2026}
 }
+
+@article{skillopt2026,
+  title={SkillOpt: Executive Strategy for Self-Evolving Agent Skills},
+  author={Yang, Yifan and Gong, Ziyang and Huang, Weiquan and Yang, Qihao and Zhou, Ziwei
+          and Huang, Zisu and Li, Yan and Gao, Xuemei and Dai, Qi and Liu, Bei
+          and Qiu, Kai and Yang, Yuqing and Chen, Dongdong and Yang, Xue and Luo, Chong},
+  journal={arXiv preprint arXiv:2605.23904},
+  year={2026}
+}
+
+@article{skillprox2026,
+  title={SkillProx: Self-Evolving Agent Skills via Proximal Textual Gradient Descent},
+  author={Zheng, Mingxuan and Zhou, Yujin and Cao, Chuxue and Yin, Boqin and Zhang, Yuyao
+          and Sun, Jiapeng and Gong, Shuaishuai and Han, Sirui and Guo, Yike},
+  journal={arXiv preprint arXiv:2608.07449},
+  year={2026}
+}
+
+@article{skilljack2026,
+  title={SkillJack: Persistent Skill Backdoors in Self-Evolving Agents},
+  author={Ying, Zonghao and Wu, Xiangfan and Wu, Huiyu and Zheng, Xing
+          and Cheng, Huangsheng and Shi, Xiaorong and Guo, Jing},
+  journal={arXiv preprint arXiv:2608.03509},
+  year={2026}
+}
 ```
+
+EmbodiSkill authors: Ruofei Ju, Xinrui Wang, Xin Ding, Yifan Yang, Hao Wu,
+Shiqi Jiang, Qianxi Zhang, Hao Wen, Xiangyu Li, Weijun Wang, Kun Li, Yunxin Liu,
+Haipeng Dai, Wei Wang, Ting Cao ([arXiv 2605.10332](https://arxiv.org/abs/2605.10332)).
+
+Examples cite [agentskills.io](https://agentskills.io/specification),
+[anthropics/skills](https://github.com/anthropics/skills) (directory format only),
+and [alibaba/skill-up](https://github.com/alibaba/skill-up) `code-stats`.
 
 ## License
 

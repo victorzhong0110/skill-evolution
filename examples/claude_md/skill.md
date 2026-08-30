@@ -1,5 +1,6 @@
 ---
 name: claude-md
+description: Project assistant guidance in CLAUDE.md form. Use when evolving a repo's CLAUDE.md rather than an Agent Skills package.
 version: 0
 domain: ai-assistant-guidance
 tags: [claude-md, agent-guidance, example]

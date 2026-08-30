@@ -23,18 +23,32 @@ from rich.console import Console
 from skill_evolution.config import Config
 from skill_evolution.core.auditor import Auditor, AuditReport, AuditSeverity
 from skill_evolution.core.comparator import Comparator, DeltaSignal
-from skill_evolution.core.explorer import Explorer
+from skill_evolution.core.explorer import Explorer, Strategy
 from skill_evolution.core.patcher import Patcher
 from skill_evolution.core.prompt_safety import ensure_prompt_safe
 from skill_evolution.evaluation.evaluator import (
     KeywordEvaluator,
+    PerTaskEvaluator,
     TaskEvaluator,
+    UnconfiguredEvaluatorError,
     load_evaluator_class,
 )
+from skill_evolution.evaluation.tasks import TaskSpec, normalize_tasks
 from skill_evolution.llm import create_llm
 from skill_evolution.runner.executor import TaskExecutor, TaskOutcome, Trajectory
+from skill_evolution.skill.regression_gate import check_regression
 from skill_evolution.skill.schema import Skill
 from skill_evolution.skill.versioning import SkillVersionManager
+
+FOLLOW_SKILL = Strategy(
+    id=0,
+    name="follow-skill",
+    description="Follow the skill as written",
+    approach=(
+        "Execute the task by following the skill document exactly. "
+        "Run bundled scripts when they apply."
+    ),
+)
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +68,8 @@ class RoundReport:
     audit_passed: bool
     changelog: str = ""
     cost_estimate: float = 0.0
+    held_out_passed: bool = True
+    gate_summary: str = ""
 
 
 @dataclass
@@ -79,6 +95,7 @@ class EvolutionReport:
                 f"  Round {r.round_num}: "
                 f"success={success_rate}, signals={r.signals_extracted}, "
                 f"audit={'PASS' if r.audit_passed else 'FAIL'}"
+                + (f", held-out={r.gate_summary}" if r.gate_summary else "")
             )
         lines.append(f"Total estimated cost: ${self.total_cost:.4f}")
         return "\n".join(lines)
@@ -109,25 +126,25 @@ class EvolutionPipeline:
     async def evolve(
         self,
         skill: Skill,
-        tasks: list[str],
+        tasks: list[str] | list[TaskSpec],
         workspace: Path | None = None,
     ) -> tuple[Skill, EvolutionReport]:
         """Run the full evolution loop.
 
         Args:
             skill: Initial skill document
-            tasks: List of task descriptions to test the skill against
+            tasks: Task prompts, or TaskSpec objects with train/held-out splits
             workspace: Directory for version snapshots (optional)
 
         Returns:
             (evolved_skill, evolution_report)
         """
-        # Boundary validation: inputs containing reserved ===TOKEN=== delimiters
-        # would corrupt section parsing downstream (prompt-injection surface).
+        specs = normalize_tasks(tasks)
+        self._ensure_scorable(specs)
         ensure_prompt_safe(skill.body, source="skill body")
         ensure_prompt_safe(skill.appendix, source="skill appendix")
-        for idx, task in enumerate(tasks):
-            ensure_prompt_safe(task, source=f"tasks[{idx}]")
+        for spec in specs:
+            ensure_prompt_safe(spec.prompt, source=f"tasks[{spec.id}]")
 
         ws = workspace or self.config.workspace_dir
         vm = SkillVersionManager(ws, skill.metadata.name)
@@ -162,7 +179,7 @@ class EvolutionPipeline:
                 break
 
             round_report = await self._run_round(
-                current_skill, tasks, k, round_num
+                current_skill, specs, k, round_num
             )
             report.rounds.append(round_report)
 
@@ -181,97 +198,150 @@ class EvolutionPipeline:
 
         return current_skill, report
 
+    def _ensure_scorable(self, tasks: list[TaskSpec]) -> None:
+        fallback = self.evaluator
+        unconfigured = isinstance(fallback, KeywordEvaluator) and not fallback.is_configured
+        if unconfigured and not any(task.has_criteria for task in tasks):
+            raise UnconfiguredEvaluatorError(
+                "Refusing to evolve: the evaluator has no scoring criteria and no task "
+                "lists required/forbidden/expected_patterns. An empty KeywordEvaluator "
+                "marks every trajectory SUCCESS and starves contrastive learning. "
+                "Use a JSON task file with criteria, or set evolution.evaluator_class."
+            )
+
     async def _run_round(
         self,
         skill: Skill,
-        tasks: list[str],
+        tasks: list[TaskSpec],
         k: int,
         round_num: int,
     ) -> RoundReport:
         """Execute one evolution round."""
+        train = [t for t in tasks if t.split == "train"]
+        held_out = [t for t in tasks if t.split == "held_out"]
+        if not train:
+            train = list(tasks)
 
-        # Step 1: Generate diverse strategies
         console.print("[dim]Generating diverse strategies...[/dim]")
         all_trajectories: list[Trajectory] = []
+        scorer = PerTaskEvaluator(self.evaluator)
 
-        for task_idx, task in enumerate(tasks):
-            console.print(f"  Task {task_idx + 1}/{len(tasks)}: {task[:60]}...")
+        for task_idx, task in enumerate(train):
+            console.print(f"  Task {task_idx + 1}/{len(train)}: {task.prompt[:60]}...")
             strategies = await self.explorer.generate_strategies(
-                task_description=task,
+                task_description=task.prompt,
                 skill_text=skill.full_text,
                 k=k,
             )
             console.print(f"    Generated {len(strategies)} strategies")
 
-            # Step 2: Execute each strategy independently
             for strat in strategies:
                 trajectory = await self.executor.execute(
-                    task_description=task,
+                    task_description=task.prompt,
                     skill_text=skill.full_text,
                     strategy=strat,
+                    package_dir=skill.package_dir,
+                    script_paths=skill.script_paths,
                 )
-                # Step 3: External evaluation (replaces self-assessment)
                 try:
-                    result = self.evaluator.evaluate(task, trajectory.response)
+                    result = scorer.evaluate_task(task, trajectory.response)
                     trajectory.outcome = result.outcome
                     trajectory.outcome_reason = result.reason
                 except Exception as exc:
-                    logger.warning("Evaluator failed for task %d strategy %s: %s", task_idx, strat.name, exc)
+                    logger.warning("Evaluator failed for task %s strategy %s: %s", task.id, strat.name, exc)
                     trajectory.outcome = TaskOutcome.FAILURE
                     trajectory.outcome_reason = f"Evaluator error: {exc}"
 
                 all_trajectories.append(trajectory)
                 icon = "✓" if trajectory.outcome == TaskOutcome.SUCCESS else "✗"
-                console.print(f"    [{strat.name}] {icon} {trajectory.outcome.value}")
+                used = "invoked" if trajectory.skill_used else "bypass"
+                console.print(f"    [{strat.name}] {icon} {trajectory.outcome.value} ({used})")
 
-        # Step 4: Contrastive comparison
         console.print("[dim]Comparing trajectories...[/dim]")
         signals = await self.comparator.compare(all_trajectories, skill.full_text)
         console.print(f"  Extracted {len(signals)} delta signals")
 
+        unused = sum(1 for t in all_trajectories if not t.skill_used)
+        if unused and unused == len(all_trajectories):
+            signals.append(DeltaSignal(
+                category="wrong_approach",
+                description="Silent bypass: every trajectory ignored the skill at runtime.",
+                evidence=f"{unused}/{len(all_trajectories)} runs did not invoke the skill.",
+                confidence=0.85,
+                affects="body",
+            ))
+
         for s in signals:
             console.print(f"    [{s.affects}] {s.category} (conf={s.confidence:.2f}): {s.description[:80]}")
 
-        # Step 5: Patch skill (on a deep copy — T3 fix for in-memory mutation)
         changelog = ""
+        audit_passed = True
+        held_out_passed = True
+        gate_summary = ""
         if signals:
             console.print("[dim]Applying patches...[/dim]")
+            original_len = len(skill.body)
             skill_snapshot = copy.deepcopy(skill)
             updated_skill, changelog = await self.patcher.patch(skill_snapshot, signals)
             console.print(f"  Changes applied:\n{changelog[:500]}")
 
-            # Step 6: Independent audit of the patched version
-            audit_passed = True
+            if (
+                len(updated_skill.body) > original_len * 1.25
+                and "DELETE" not in changelog.upper()
+            ):
+                console.print("  [yellow]Patch grew >25% with no DELETE — adding shrinkage signal[/yellow]")
+                signals.append(DeltaSignal(
+                    category="redundancy",
+                    description="Skill grew without deleting unused content.",
+                    evidence=changelog[:300],
+                    confidence=0.7,
+                    affects="body",
+                ))
+
             if self.config.audit.enabled:
                 console.print("[dim]Running independent audit...[/dim]")
-                audit_report = await self.auditor.audit(updated_skill)
+                audit_report = await self.auditor.audit(updated_skill, trajectories=all_trajectories)
                 audit_passed = audit_report.passed
                 severity_color = "green" if audit_passed else "red"
                 console.print(
                     f"  Audit: [{severity_color}]{audit_report.overall.value}[/{severity_color}] "
                     f"— {audit_report.summary}"
                 )
+            else:
+                audit_report = None
 
-            if audit_passed:
+            if audit_passed and self.config.evolution.held_out_gate and held_out:
+                console.print("[dim]Scoring held-out split...[/dim]")
+                baseline = await self._score_tasks(skill, held_out)
+                candidate = await self._score_tasks(updated_skill, held_out)
+                verdict = check_regression(
+                    baseline, candidate, self.config.evolution.gate_tolerance
+                )
+                held_out_passed = verdict.passed
+                gate_summary = verdict.summary
+                console.print(f"  Held-out gate: {verdict.summary}")
+                if not held_out_passed:
+                    console.print("  [yellow]Held-out regression — rolling back patch[/yellow]")
+
+            if audit_passed and held_out_passed:
                 skill.body = updated_skill.body
                 skill.appendix = updated_skill.appendix
+                skill.metadata.description = updated_skill.metadata.description
             else:
-                # Rollback: discard patched version, convert findings to DeltaSignals
-                console.print("  [yellow]Audit failed — rolling back patch, feeding findings as signals[/yellow]")
+                console.print("  [yellow]Rolling back patch, feeding findings as signals[/yellow]")
                 changelog = ""
-                audit_signals = self._audit_findings_to_signals(audit_report)
-                signals.extend(audit_signals)
-                logger.info(
-                    "Round %d audit failed: rolled back patch, generated %d feedback signals",
-                    round_num, len(audit_signals),
-                )
-        else:
-            audit_passed = True
+                if audit_report is not None and not audit_passed:
+                    audit_signals = self._audit_findings_to_signals(audit_report)
+                    signals.extend(audit_signals)
+                    logger.info(
+                        "Round %d audit failed: rolled back patch, generated %d feedback signals",
+                        round_num, len(audit_signals),
+                    )
 
         successes = sum(1 for t in all_trajectories if t.outcome == TaskOutcome.SUCCESS)
         return RoundReport(
             round_num=round_num,
-            strategies_generated=k * len(tasks),
+            strategies_generated=k * len(train),
             trajectories_total=len(all_trajectories),
             trajectories_success=successes,
             trajectories_failure=len(all_trajectories) - successes,
@@ -279,7 +349,25 @@ class EvolutionPipeline:
             audit_passed=audit_passed,
             changelog=changelog,
             cost_estimate=self.llm.usage.estimated_cost_usd,
+            held_out_passed=held_out_passed,
+            gate_summary=gate_summary,
         )
+
+    async def _score_tasks(self, skill: Skill, tasks: list[TaskSpec]) -> dict[str, float]:
+        """Score a skill on a task split with a single follow-skill strategy."""
+        scorer = PerTaskEvaluator(self.evaluator)
+        scores: dict[str, float] = {}
+        for task in tasks:
+            traj = await self.executor.execute(
+                task_description=task.prompt,
+                skill_text=skill.full_text,
+                strategy=FOLLOW_SKILL,
+                package_dir=skill.package_dir,
+                script_paths=skill.script_paths,
+            )
+            result = scorer.evaluate_task(task, traj.response)
+            scores[task.id] = result.score
+        return scores
 
     @staticmethod
     def _audit_findings_to_signals(report: AuditReport) -> list[DeltaSignal]:

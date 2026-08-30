@@ -27,10 +27,21 @@ class EvolutionConfig(BaseModel):
     num_rounds: int = Field(default=2, ge=1, le=10, description="R: evolution rounds")
     budget_usd: float | None = Field(default=None, description="Max spend in USD; None = unlimited")
     auto_snapshot: bool = Field(default=True, description="Auto-snapshot skill after each round")
+    held_out_gate: bool = Field(
+        default=True,
+        description="Reject a patch when held-out task scores regress (SkillOpt-style gate).",
+    )
+    gate_tolerance: float = Field(
+        default=0.0,
+        ge=0.0,
+        description="Allowed held-out score drop before the gate fails.",
+    )
     evaluator_class: str | None = Field(
         default=None,
         description="Dotted path to a TaskEvaluator subclass (e.g. 'mypackage.MyEvaluator'). "
-        "If None, uses KeywordEvaluator with no configuration.",
+        "If None, each task must carry its own required/forbidden/expected_patterns, "
+        "or KeywordEvaluator must be constructed with criteria. An empty KeywordEvaluator "
+        "is refused at evolve() time.",
     )
 
 
@@ -45,6 +56,8 @@ class AuditConfig(BaseModel):
             "silent_bypass",
             "consistency",
             "generalizability",
+            "provenance",
+            "shrinkage",
         ]
     )
 

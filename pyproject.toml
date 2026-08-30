@@ -4,13 +4,13 @@ build-backend = "hatchling.build"
 
 [project]
 name = "skill-evolution"
-version = "0.1.0"
+version = "0.2.0"
 description = "Evolve AI agent skills through iterative meta-skill-driven optimization"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
 authors = [
-    { name = "Seafoodhk" },
+    { name = "victorzhong0110", email = "victorzhong0110@gmail.com" },
 ]
 keywords = ["ai", "agent", "skill", "evolution", "meta-learning"]
 classifiers = [
@@ -28,6 +28,11 @@ dependencies = [
     "openai>=1.0.0",
     "pydantic>=2.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/victorzhong0110/skill-evolution"
+Repository = "https://github.com/victorzhong0110/skill-evolution"
+Issues = "https://github.com/victorzhong0110/skill-evolution/issues"
 
 [project.optional-dependencies]
 dev = [

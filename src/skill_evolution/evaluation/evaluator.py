@@ -36,11 +36,20 @@ class TaskEvaluator(Protocol):
     def evaluate(self, task_input: str, task_output: str) -> EvalResult: ...
 
 
+class UnconfiguredEvaluatorError(ValueError):
+    """Raised when evolution would run with an evaluator that cannot fail."""
+
+
 class KeywordEvaluator:
     """Evaluates output by checking for required/forbidden keywords.
 
     A simple structural evaluator that doesn't use LLM calls,
     avoiding the evaluation circularity problem entirely.
+
+    An instance with no required and no forbidden keywords is *unconfigured*:
+    it would mark every trajectory SUCCESS and starve contrastive learning.
+    Constructing it is allowed for tests; the pipeline refuses to evolve with it
+    unless every task carries its own criteria.
     """
 
     def __init__(
@@ -50,6 +59,10 @@ class KeywordEvaluator:
     ):
         self._required = required or []
         self._forbidden = forbidden or []
+
+    @property
+    def is_configured(self) -> bool:
+        return bool(self._required or self._forbidden)
 
     def evaluate(self, task_input: str, task_output: str) -> EvalResult:
         output_lower = task_output.lower()
@@ -116,6 +129,33 @@ class GroundTruthEvaluator:
             reason=f"Matched {matches}/{len(self._patterns)} expected patterns",
             score=score,
         )
+
+
+class PerTaskEvaluator:
+    """Score a trajectory with task-level criteria, falling back to a global evaluator."""
+
+    def __init__(self, fallback: TaskEvaluator):
+        self._fallback = fallback
+
+    def evaluate(self, task_input: str, task_output: str) -> EvalResult:
+        return self._fallback.evaluate(task_input, task_output)
+
+    def evaluate_task(self, task: object, task_output: str) -> EvalResult:
+        required = list(getattr(task, "required", []) or [])
+        forbidden = list(getattr(task, "forbidden", []) or [])
+        patterns = list(getattr(task, "expected_patterns", []) or [])
+        prompt = str(getattr(task, "prompt", "") or task_input_fallback(task))
+        if required or forbidden:
+            return KeywordEvaluator(required=required, forbidden=forbidden).evaluate(prompt, task_output)
+        if patterns:
+            return GroundTruthEvaluator(expected_patterns=patterns).evaluate(prompt, task_output)
+        return self._fallback.evaluate(prompt, task_output)
+
+
+def task_input_fallback(task: object) -> str:
+    if isinstance(task, str):
+        return task
+    return str(getattr(task, "prompt", task))
 
 
 def load_evaluator_class(class_path: str) -> type[TaskEvaluator]:

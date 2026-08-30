@@ -1,5 +1,6 @@
 ---
 name: code-review
+description: Review a code change for correctness, security, and maintainability. Use when the user pastes a diff, function, or asks "what's wrong with this code".
 version: 0
 domain: engineering
 tags: [code-review, engineering, quality]

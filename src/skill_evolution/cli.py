@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import json
 from pathlib import Path
 
 import click
@@ -12,6 +11,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 from skill_evolution.config import Config
+from skill_evolution.evaluation.tasks import load_task_specs
 from skill_evolution.skill.schema import Skill
 from skill_evolution.skill.versioning import SkillVersionManager
 
@@ -30,20 +30,8 @@ def _load_config(config_path: str | None) -> Config:
 
 
 def _load_tasks(task_path: str) -> list[str]:
-    """Load task descriptions from a file (one per line or JSON array)."""
-    path = Path(task_path)
-    text = path.read_text(encoding="utf-8").strip()
-
-    # Try JSON array first
-    if text.startswith("["):
-        return json.loads(text)
-
-    # Otherwise, treat as one task per line (skip empty lines and comments)
-    return [
-        line.strip()
-        for line in text.split("\n")
-        if line.strip() and not line.strip().startswith("#")
-    ]
+    """Load task prompts (legacy helper used by tests)."""
+    return [spec.prompt for spec in load_task_specs(task_path)]
 
 
 @click.group()
@@ -78,8 +66,8 @@ def evolve(
 ):
     """Evolve a skill using a set of test tasks.
 
-    SKILL_PATH: Path to the initial skill document (.md)
-    TASKS_PATH: Path to task descriptions (one per line or JSON array)
+    SKILL_PATH: Path to a skill file (.md) or an Agent Skills directory (SKILL.md)
+    TASKS_PATH: Tasks as txt, JSON array, {train,held_out}, or skill-creator evals.json
     """
     config = _load_config(config_path)
 
@@ -95,14 +83,15 @@ def evolve(
     if model is not None:
         config.llm.model = model
 
-    # Load inputs
-    skill = Skill.from_file(Path(skill_path))
-    tasks = _load_tasks(tasks_path)
+    skill = Skill.from_path(Path(skill_path))
+    tasks = load_task_specs(tasks_path)
+    train_n = sum(1 for t in tasks if t.split == "train")
+    held_n = sum(1 for t in tasks if t.split == "held_out")
 
     budget_label = f"${config.evolution.budget_usd}" if config.evolution.budget_usd else "unlimited"
     console.print(Panel(
         f"[bold]Skill:[/bold] {skill.metadata.name}\n"
-        f"[bold]Tasks:[/bold] {len(tasks)}\n"
+        f"[bold]Tasks:[/bold] {len(tasks)} (train={train_n}, held-out={held_n})\n"
         f"[bold]Rounds:[/bold] {config.evolution.num_rounds}\n"
         f"[bold]Strategies/task:[/bold] {config.evolution.num_strategies}\n"
         f"[bold]Provider:[/bold] {config.llm.provider} ({config.llm.model})\n"
@@ -111,15 +100,26 @@ def evolve(
         border_style="cyan",
     ))
 
-    # Run evolution
     from skill_evolution.core.pipeline import EvolutionPipeline
+    from skill_evolution.evaluation.evaluator import UnconfiguredEvaluatorError
+
     ws = Path(workspace) if workspace else config.workspace_dir
     pipeline = EvolutionPipeline(config, workspace=ws)
 
-    evolved_skill, report = asyncio.run(pipeline.evolve(skill, tasks, ws))
+    try:
+        evolved_skill, report = asyncio.run(pipeline.evolve(skill, tasks, ws))
+    except UnconfiguredEvaluatorError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise SystemExit(2) from exc
 
-    # Save output
-    output_path = Path(output) if output else Path(skill_path).with_suffix(".evolved.md")
+    skill_in = Path(skill_path)
+    if output:
+        output_path = Path(output)
+    elif skill_in.is_dir() or skill_in.name == "SKILL.md":
+        parent = skill_in if skill_in.is_dir() else skill_in.parent
+        output_path = parent.parent / f"{parent.name}.evolved"
+    else:
+        output_path = skill_in.with_suffix(".evolved.md")
     evolved_skill.save(output_path)
     console.print(f"\n[bold green]Evolved skill saved to:[/bold green] {output_path}")
     console.print(report.summary())
@@ -138,7 +138,7 @@ def audit(skill_path: str, config_path: str | None, provider: str | None, model:
     if model:
         config.llm.model = model
 
-    skill = Skill.from_file(Path(skill_path))
+    skill = Skill.from_path(Path(skill_path))
 
     from skill_evolution.core.auditor import Auditor
     from skill_evolution.llm import create_llm

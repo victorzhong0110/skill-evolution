@@ -1,0 +1,21 @@
+{
+  "train": [
+    {
+      "id": "analyze-directory",
+      "prompt": "Analyze the sample project at evals/fixtures/sample-project using the code-stats skill. Report statistics in the full Code Statistics format with Summary, Files by Extension, Top File Extensions, and Largest Files sections.",
+      "required": ["Files by Extension", "Total Files", "Total Lines", "|"]
+    },
+    {
+      "id": "top-extensions",
+      "prompt": "Use the code-stats skill on evals/fixtures/sample-project. Report the full Code Statistics output, including the top file extensions by total line count.",
+      "required": ["Files by Extension", "Top 5 File Extensions", "Total Files"]
+    }
+  ],
+  "held_out": [
+    {
+      "id": "largest-files",
+      "prompt": "Run code-stats on evals/fixtures/sample-project. Include Summary, Files by Extension, Top 5 File Extensions by Line Count, and Largest Files sections.",
+      "required": ["Largest Files", "Files by Extension", "Total Lines", "|"]
+    }
+  ]
+}

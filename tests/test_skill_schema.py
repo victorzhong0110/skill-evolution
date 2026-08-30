@@ -136,3 +136,16 @@ class TestSkillSerialization:
         skill = Skill(body="nested")
         skill.save(path)
         assert path.exists()
+
+    def test_parse_agent_skills_description(self):
+        text = (
+            "---\n"
+            "name: frontend-design\n"
+            "description: Distinctive UI guidance. Use when building a new page.\n"
+            "---\n\n"
+            "# Body\n"
+        )
+        skill = Skill.from_markdown(text)
+        assert "Distinctive UI" in skill.metadata.description
+        dumped = skill.to_markdown()
+        assert "description:" in dumped

@@ -7,9 +7,11 @@ import pytest
 from skill_evolution.evaluation.evaluator import (
     GroundTruthEvaluator,
     KeywordEvaluator,
+    PerTaskEvaluator,
     TaskEvaluator,
     load_evaluator_class,
 )
+from skill_evolution.evaluation.tasks import TaskSpec
 from skill_evolution.runner.executor import TaskOutcome
 
 
@@ -42,6 +44,10 @@ class TestKeywordEvaluator:
         ev = KeywordEvaluator()
         result = ev.evaluate("task", "anything")
         assert result.outcome == TaskOutcome.SUCCESS
+        assert ev.is_configured is False
+
+    def test_is_configured_with_required(self):
+        assert KeywordEvaluator(required=["hello"]).is_configured is True
 
     def test_implements_protocol(self):
         assert isinstance(KeywordEvaluator(), TaskEvaluator)
@@ -72,6 +78,22 @@ class TestGroundTruthEvaluator:
 
     def test_implements_protocol(self):
         assert isinstance(GroundTruthEvaluator(), TaskEvaluator)
+
+
+class TestPerTaskEvaluator:
+    def test_uses_task_required_over_fallback(self):
+        fallback = KeywordEvaluator(required=["never-match"])
+        ev = PerTaskEvaluator(fallback)
+        task = TaskSpec(prompt="count", required=["Total Files"])
+        result = ev.evaluate_task(task, "Total Files: 4")
+        assert result.outcome == TaskOutcome.SUCCESS
+
+    def test_falls_back_when_task_has_no_criteria(self):
+        fallback = KeywordEvaluator(required=["hello"])
+        ev = PerTaskEvaluator(fallback)
+        task = TaskSpec(prompt="say hi")
+        result = ev.evaluate_task(task, "hello world")
+        assert result.outcome == TaskOutcome.SUCCESS
 
 
 class TestLoadEvaluatorClass:

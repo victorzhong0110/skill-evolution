@@ -32,6 +32,19 @@ class TestLoadTasks:
         tasks = _load_tasks(str(task_file))
         assert tasks == ["Real task"]
 
+    def test_load_train_held_out_prompts(self, tmp_path: Path):
+        task_file = tmp_path / "tasks.json"
+        task_file.write_text(
+            json.dumps(
+                {
+                    "train": [{"prompt": "Train task", "required": ["A"]}],
+                    "held_out": [{"prompt": "Held task", "required": ["B"]}],
+                }
+            )
+        )
+        tasks = _load_tasks(str(task_file))
+        assert tasks == ["Train task", "Held task"]
+
 
 class TestLoadConfig:
     def test_returns_defaults_when_no_config(self, tmp_path: Path, monkeypatch):

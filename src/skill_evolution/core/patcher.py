@@ -22,7 +22,9 @@ CRITICAL RULES:
 2. For "body" signals: modify the core skill content
 3. For "appendix" signals: add reinforcement notes to the appendix section \
    (the skill content is correct, agents just need reminders to follow it)
-4. Never remove correct information — only add, refine, or correct
+4. Operations are ADD, REFINE, DEMOTE (move body → appendix), and DELETE. \
+   DELETE is required when a signal is category=redundancy, or when a rule is \
+   instance-specific, contradictory, or unused. Growth without deletion is a defect.
 5. Keep the same writing style and structure as the original
 6. If signals conflict, prioritize higher-confidence signals
 """
@@ -37,7 +39,10 @@ Output the complete updated skill in two clearly labeled sections:
 <the complete updated appendix text>
 
 ===CHANGELOG===
-- <what you changed and why, one line per change>
+- ADD: <what you added>
+- REFINE: <what you changed>
+- DEMOTE: <what you moved to appendix>
+- DELETE: <what you removed and why>
 """
 
 
@@ -75,7 +80,9 @@ class Patcher:
 ## Delta Signals to Apply
 {signals_text}
 
-Apply these signals as targeted patches. Remember: minimal changes, preserve everything else."""
+Apply these signals as targeted patches. Remember: minimal changes, preserve everything else.
+If any signal is category=redundancy, you MUST DELETE or DEMOTE the redundant content.
+Tag every changelog line ADD, REFINE, DEMOTE, or DELETE."""
 
         resp = await self.llm.ask(prompt=prompt, system=self._system_prompt, temperature=0.3)
         return self._parse_patched_skill(resp.content, skill)
