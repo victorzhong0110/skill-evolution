@@ -28,7 +28,7 @@ class SkillMetadata(BaseModel):
     allowed_tools: str | None = Field(default=None, alias="allowed-tools")
     version: int = 0
     domain: str = "general"
-    author: str = "skill-evolution"
+    author: str = "victorzhong0110"
     target_model: str | None = None
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     evolved_at: str | None = None

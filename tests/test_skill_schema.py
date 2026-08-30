@@ -13,6 +13,7 @@ class TestSkillMetadata:
         assert meta.name == "untitled"
         assert meta.version == 0
         assert meta.domain == "general"
+        assert meta.author == "victorzhong0110"
         assert meta.tags == []
 
     def test_custom_values(self):

@@ -2,7 +2,7 @@
 name: strategy-generation
 version: 1
 domain: meta
-author: skill-evolution
+author: victorzhong0110
 tags: [meta-skill, exploration, diversity]
 ---
 
