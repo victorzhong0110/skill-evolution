@@ -16,11 +16,23 @@ class TestLLMConfig:
         assert "claude" in cfg.model
         assert cfg.temperature == 0.7
         assert cfg.api_key is None
+        assert cfg.timeout_s == 60.0
+        assert cfg.max_retries == 3
+        assert cfg.retry_backoff_s == 0.5
 
     def test_openai_provider(self):
         cfg = LLMConfig(provider="openai", model="gpt-4o")
         assert cfg.provider == "openai"
         assert cfg.model == "gpt-4o"
+
+    def test_timeout_and_retry_bounds(self):
+        with pytest.raises(Exception):
+            LLMConfig(timeout_s=0)
+        with pytest.raises(Exception):
+            LLMConfig(max_retries=7)
+        cfg = LLMConfig(timeout_s=90, max_retries=0)
+        assert cfg.timeout_s == 90
+        assert cfg.max_retries == 0
 
 
 class TestEvolutionConfig:
@@ -52,7 +64,12 @@ class TestConfig:
 
     def test_save_and_load(self, tmp_path: Path):
         original = Config(
-            llm=LLMConfig(provider="openai", model="gpt-4o"),
+            llm=LLMConfig(
+                provider="openai",
+                model="gpt-4o",
+                timeout_s=45.0,
+                max_retries=2,
+            ),
             evolution=EvolutionConfig(num_rounds=5, num_strategies=6),
         )
         path = tmp_path / "config.yaml"
@@ -61,6 +78,8 @@ class TestConfig:
         loaded = Config.load(path)
         assert loaded.llm.provider == "openai"
         assert loaded.llm.model == "gpt-4o"
+        assert loaded.llm.timeout_s == 45.0
+        assert loaded.llm.max_retries == 2
         assert loaded.evolution.num_rounds == 5
         assert loaded.evolution.num_strategies == 6
 

@@ -85,12 +85,39 @@ class TestFactory:
         cfg = LLMConfig(provider="claude", model="claude-sonnet-4-20250514")
         backend = create_llm(cfg)
         assert backend.__class__.__name__ == "ClaudeBackend"
+        assert backend.timeout_s == 60.0
+        assert backend.max_retries == 3
+        assert backend.client.max_retries == 0
 
     def test_create_openai_backend(self, monkeypatch):
         monkeypatch.setenv("OPENAI_API_KEY", "sk-test-key")
         cfg = LLMConfig(provider="openai", model="gpt-4o")
         backend = create_llm(cfg)
         assert backend.__class__.__name__ == "OpenAIBackend"
+        assert backend.timeout_s == 60.0
+        assert backend.max_retries == 3
+        assert backend.client.max_retries == 0
+
+    def test_http_retry_config_reaches_backends(self, monkeypatch):
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-test-key")
+        cfg = LLMConfig(
+            provider="openai",
+            timeout_s=12.5,
+            max_retries=1,
+            retry_backoff_s=0.25,
+        )
+        backend = create_llm(cfg)
+        assert backend.timeout_s == 12.5
+        assert backend.max_retries == 1
+        assert backend.retry_backoff_s == 0.25
+
+    def test_max_retries_clamped_by_config(self):
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError):
+            LLMConfig(max_retries=7)
+        with pytest.raises(ValidationError):
+            LLMConfig(max_retries=-1)
 
     def test_openai_backend_requires_key(self, monkeypatch):
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)

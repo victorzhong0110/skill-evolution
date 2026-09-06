@@ -2,7 +2,9 @@
 
 Each execution is a fresh LLM call (SkillEvolver: deployment-driven feedback).
 When the skill is an Agent Skills package with scripts/, the executor can run
-those scripts in a sandboxed subprocess instead of asking the model to fake them.
+those scripts in a path-jailed host subprocess (relative path under scripts/
+only; inherits os.environ; ~30s timeout). This is not Docker or container
+isolation — the process runs on the host with the parent environment.
 """
 
 from __future__ import annotations
@@ -172,7 +174,11 @@ def _mentions_any(text: str, needles: list[str]) -> bool:
 
 
 async def _run_skill_script(package_dir: Path, rel_path: str, args: str) -> tuple[str, str]:
-    """Run a script that lives under package_dir/scripts/. Returns (stdout, stderr)."""
+    """Run a script that lives under package_dir/scripts/. Returns (stdout, stderr).
+
+    Path jail only: relative path, no ``..``, must resolve under ``scripts/``.
+    Host subprocess inherits ``os.environ``, 30s timeout, no container.
+    """
     package_dir = package_dir.resolve()
     requested = Path(rel_path)
     if requested.is_absolute() or ".." in requested.parts:

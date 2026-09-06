@@ -20,13 +20,22 @@ def create_llm(config: LLMConfig | None = None) -> LLMBackend:
         return CliLLMBackend(model=config.model)
     elif config.provider == "claude":
         from skill_evolution.llm.claude_backend import ClaudeBackend
-        return ClaudeBackend(model=config.model, api_key=config.api_key)
+        return ClaudeBackend(
+            model=config.model,
+            api_key=config.api_key,
+            timeout_s=config.timeout_s,
+            max_retries=config.max_retries,
+            retry_backoff_s=config.retry_backoff_s,
+        )
     elif config.provider == "openai":
         from skill_evolution.llm.openai_backend import OpenAIBackend
         return OpenAIBackend(
             model=config.model,
             api_key=config.api_key,
             base_url=config.base_url,
+            timeout_s=config.timeout_s,
+            max_retries=config.max_retries,
+            retry_backoff_s=config.retry_backoff_s,
         )
     else:
         raise ValueError(f"Unknown LLM provider: {config.provider}")

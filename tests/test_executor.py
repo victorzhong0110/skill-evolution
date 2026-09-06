@@ -39,7 +39,16 @@ class TestTrajectoryDefaults:
         assert "===ASSESSMENT===" not in TaskExecutor.SYSTEM_PROMPT
 
 
-class TestScriptSandbox:
+def test_docs_do_not_claim_sandbox_isolation():
+    from skill_evolution.runner import executor as executor_mod
+
+    blob = (executor_mod.__doc__ or "") + (_run_skill_script.__doc__ or "")
+    assert "sandbox" not in blob.lower()
+    assert "docker" not in blob.lower() or "not docker" in blob.lower()
+    assert "path-jail" in blob.lower() or "path-jailed" in blob.lower()
+
+
+class TestScriptPathJail:
     def _pkg(self, tmp_path: Path) -> Path:
         scripts = tmp_path / "scripts"
         scripts.mkdir()

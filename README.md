@@ -66,12 +66,16 @@ Key design principles:
 pip install skill-evolution
 ```
 
-Or for development:
+Or for development (reproducible lock used by CI):
 
 ```bash
 git clone https://github.com/victorzhong0110/skill-evolution.git
-cd skill-evolution && pip install -e ".[dev]"
+cd skill-evolution
+pip install -r requirements-dev.txt
+pip install -e . --no-deps
 ```
+
+`pip install -e ".[dev]"` still works; versions then float within the ranges in `pyproject.toml`.
 
 ### Evolve a public-format skill (recommended)
 
@@ -130,10 +134,15 @@ or a single Markdown file. Directories are preferred:
 ```
 my-skill/
 ├── SKILL.md          # required: YAML name + description, then instructions
-├── scripts/          # optional; executor may run these under scripts/
+├── scripts/          # optional; path-jail host subprocess (see below)
 ├── references/       # optional; loaded on demand
 └── assets/
 ```
+
+Bundled scripts are **not** a sandbox or container. The executor starts a host
+subprocess: the path must be relative and resolve under `scripts/` (no `..`,
+no absolute paths), the process inherits `os.environ`, and it is killed after
+about 30 seconds. There is no Docker isolation.
 
 ```markdown
 ---
@@ -192,6 +201,10 @@ llm:
   provider: claude          # claude | openai | cli | bridge
   model: claude-sonnet-4-6
   temperature: 0.7
+  # HTTP clients (claude / openai) only — cli/bridge keep their own timeouts
+  timeout_s: 60.0           # per-request HTTP timeout (default 60s)
+  max_retries: 3            # extra attempts after the first (0–6; default 3)
+  retry_backoff_s: 0.5      # initial backoff; doubles each retry, cap 8s
 evolution:
   num_strategies: 4         # K: strategies per task per round
   num_rounds: 2             # R: evolution rounds
@@ -227,7 +240,7 @@ src/skill_evolution/
 │   ├── patcher.py      # ADD / REFINE / DEMOTE / DELETE
 │   ├── auditor.py      # Independent quality audit
 │   └── pipeline.py     # Orchestrates the full loop
-├── runner/             # Task execution + scripts/ sandbox
+├── runner/             # Task execution + scripts/ path-jail host subprocess
 │   └── executor.py
 └── meta_skills/        # Built-in meta-skills (themselves evolvable)
     ├── strategy_generation.md
@@ -238,7 +251,9 @@ src/skill_evolution/
 
 ## Meta-Skills: The Bootstrap
 
-The four meta-skills in `meta_skills/` drive the evolution process itself. They can be evolved using the same pipeline — making the system self-improving:
+The four meta-skills in `meta_skills/` drive the evolution process itself. They
+can be evolved with the same pipeline (Alpha; not a verified self-improvement
+or measured-uplift claim):
 
 ```bash
 skill-evolution evolve src/skill_evolution/meta_skills/strategy_generation.md meta_skill_tasks.txt

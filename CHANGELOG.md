@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Bounded HTTP retries + configurable timeout for Claude and OpenAI-compatible
+  clients (`timeout_s=60`, `max_retries=3`, `retry_backoff_s=0.5`; cap 6 retries).
+  Transient only: timeout, 429, 5xx. SDK retries disabled to avoid nested loops.
+- `requirements-dev.txt` lock; CI installs from it. Python matrix 3.11–3.13.
+- GitHub Actions pinned to full commit SHAs (not floating `@v4` / `@v5`).
+
+### Changed
+
+- Executor / docs: `scripts/` runner is a **path-jail host subprocess**
+  (relative `scripts/` path, inherits `os.environ`, ~30s timeout). Not Docker
+  and not container isolation.
+
 ## 0.2.0 — 2026-08-30
 
 Agent Skills packages, a scorable evaluator, and a held-out promotion gate.
@@ -17,7 +33,7 @@ Agent Skills packages, a scorable evaluator, and a held-out promotion gate.
 - Task files with `{train, held_out}` and skill-creator `{evals: [...]}`.
 - SkillOpt-style held-out regression gate (`evolution.held_out_gate`).
 - Patch operations DELETE / DEMOTE; shrinkage signal when a patch grows >25% with no DELETE.
-- Script sandbox under `package_dir/scripts/` (`===RUN_SCRIPT===`); silent-bypass via `===SKILL_USED===`.
+- Script path-jail under `package_dir/scripts/` (`===RUN_SCRIPT===`); silent-bypass via `===SKILL_USED===`.
 - Auditor checks: provenance (SkillJack), shrinkage; runtime silent-bypass when trajectories never invoke the skill.
 - Flagship examples from public GitHub skills:
   - `examples/code-stats/` adapted from alibaba/skill-up (Apache-2.0)

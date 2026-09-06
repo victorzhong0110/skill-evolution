@@ -18,6 +18,28 @@ class LLMConfig(BaseModel):
     base_url: str | None = None  # For OpenAI-compatible endpoints
     temperature: float = 0.7
     max_tokens: int = 4096
+    # HTTP clients only (claude / openai). cli and bridge keep their own timeouts.
+    timeout_s: float = Field(
+        default=60.0,
+        gt=0,
+        le=600,
+        description="Per-request HTTP timeout in seconds for Claude/OpenAI clients.",
+    )
+    max_retries: int = Field(
+        default=3,
+        ge=0,
+        le=6,
+        description=(
+            "Extra attempts after the first for transient HTTP errors "
+            "(timeout, 429, 5xx). 0 = no retry. Hard-capped at 6."
+        ),
+    )
+    retry_backoff_s: float = Field(
+        default=0.5,
+        ge=0.0,
+        le=30.0,
+        description="Initial retry delay in seconds; doubles each retry, capped at 8s.",
+    )
 
 
 class EvolutionConfig(BaseModel):
