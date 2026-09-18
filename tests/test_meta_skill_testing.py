@@ -287,6 +287,21 @@ class TestTrajectoryComparisonScorer:
         result = scorer.score(case, output)
         assert not result.details.get("valid_categories", True)
 
+    def test_redundancy_category_is_valid(self):
+        scorer = TrajectoryComparisonScorer()
+        case = _make_case("trajectory_comparison", expected={"min_signals": 1})
+        output = (
+            "===SIGNAL 1===\n"
+            "Category: redundancy\n"
+            "Affects: body\n"
+            "Confidence: 0.7\n"
+            "Description: Skill contains instance-specific content to delete\n"
+            "Evidence: Changelog grew without DELETE\n"
+            "===END===\n"
+        )
+        result = scorer.score(case, output)
+        assert result.details.get("valid_categories", False)
+
     def test_confidence_out_of_range(self):
         scorer = TrajectoryComparisonScorer()
         case = _make_case("trajectory_comparison", expected={"min_signals": 1})

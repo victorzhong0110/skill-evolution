@@ -18,7 +18,7 @@ from skill_evolution.runner.executor import TaskOutcome, Trajectory
 class DeltaSignal:
     """A single improvement signal extracted from trajectory comparison."""
 
-    category: str  # "missing_knowledge", "wrong_approach", "edge_case", "efficiency"
+    category: str  # "missing_knowledge", "wrong_approach", "edge_case", "efficiency", "redundancy"
     description: str  # What the delta is
     evidence: str  # Concrete evidence from trajectories
     confidence: float  # 0-1, how confident we are this is a real signal

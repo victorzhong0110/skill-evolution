@@ -95,7 +95,7 @@ class TrajectoryComparisonScorer:
     in range, descriptions non-empty, evidence provided.
     """
 
-    VALID_CATEGORIES = {"missing_knowledge", "wrong_approach", "edge_case", "efficiency"}
+    VALID_CATEGORIES = {"missing_knowledge", "wrong_approach", "edge_case", "efficiency", "redundancy"}
 
     def score(self, case: EvalCase, output: str) -> ScoreResult:
         checks: dict[str, bool] = {}

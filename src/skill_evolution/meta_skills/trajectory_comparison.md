@@ -52,6 +52,11 @@ Example: the skill handles English text well but fails on CJK characters.
 The skill produces correct results but wastes resources. Example: the skill
 recommends checking all files when a targeted grep would suffice.
 
+### redundancy
+The skill contains unused, contradictory, or instance-specific content that
+should be deleted or demoted. Example: a rule that only applied to one past
+task but now bloats every run.
+
 ## Analysis Process
 
 1. Group trajectories by task (compare within same task, not across different tasks)

@@ -267,7 +267,7 @@ class MetaSkillEvolver:
                 "Compare these trajectories and extract delta signals.\n\n"
                 "You MUST use this exact output format:\n"
                 "===SIGNAL 1===\n"
-                "Category: <missing_knowledge|wrong_approach|edge_case|efficiency>\n"
+                "Category: <missing_knowledge|wrong_approach|edge_case|efficiency|redundancy>\n"
                 "Affects: <body|appendix>\n"
                 "Confidence: <0.0-1.0>\n"
                 "Description: <what needs to change>\n"
