@@ -76,3 +76,33 @@ New appendix
         updated, _ = patcher._parse_patched_skill(text, original_skill)
 
         assert updated.metadata.name == "test"
+
+    def test_parse_preserves_package_fields(self):
+        from pathlib import Path
+
+        original = Skill(
+            metadata=SkillMetadata(name="pkg-skill"),
+            body="body",
+            appendix="app",
+            package_dir=Path("/tmp/demo-pkg"),
+            script_paths=["scripts/a.py"],
+            reference_paths=["references/r.md"],
+        )
+        text = """\
+===UPDATED_BODY===
+New body
+
+===UPDATED_APPENDIX===
+New appendix
+
+===CHANGELOG===
+- ADD: something
+"""
+        patcher = Patcher.__new__(Patcher)
+        updated, _ = patcher._parse_patched_skill(text, original)
+
+        assert updated.package_dir == Path("/tmp/demo-pkg")
+        assert updated.script_paths == ["scripts/a.py"]
+        assert updated.reference_paths == ["references/r.md"]
+        # Must be copies, not shared mutable state
+        assert updated.script_paths is not original.script_paths

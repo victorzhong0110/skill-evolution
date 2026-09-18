@@ -114,5 +114,8 @@ Tag every changelog line ADD, REFINE, DEMOTE, or DELETE."""
             metadata=original.metadata.model_copy(),
             body=new_body,
             appendix=new_appendix,
+            package_dir=original.package_dir,
+            script_paths=list(original.script_paths),
+            reference_paths=list(original.reference_paths),
         )
         return updated, changelog
