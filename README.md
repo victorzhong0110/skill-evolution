@@ -216,32 +216,42 @@ workspace_dir: .skill-evolution
 
 ```
 src/skill_evolution/
-├── cli.py              # CLI commands (evolve, audit, history, rollback, init)
+├── cli.py              # evolve, audit, history, rollback, init, doctor, meta-evolve, meta-test, meta-snapshot
 ├── config.py           # YAML configuration
-├── llm/                # LLM abstraction (Claude + OpenAI compatible)
-├── skill/              # Skill schema + version management + regression gate
+├── llm/                # backends: claude | openai | cli | bridge (+ factory/base)
+├── skill/              # schema + versioning + regression_gate (held-out gate)
 ├── evaluation/         # Task specs, KeywordEvaluator, PerTaskEvaluator
 ├── core/               # Evolution engine
 │   ├── explorer.py     # Strategy diversification
 │   ├── comparator.py   # Contrastive trajectory analysis
 │   ├── patcher.py      # ADD / REFINE / DEMOTE / DELETE
 │   ├── auditor.py      # Independent quality audit
-│   └── pipeline.py     # Orchestrates the full loop
+│   ├── pipeline.py     # Orchestrates the full loop
+│   ├── meta_evolver.py # meta-* orchestration + score trend
+│   ├── changelog.py    # Evolution changelog
+│   └── prompt_safety.py# Reserved-delimiter guards
 ├── runner/             # Task execution + scripts/ sandbox
 │   └── executor.py
 └── meta_skills/        # Built-in meta-skills (themselves evolvable)
     ├── strategy_generation.md
     ├── trajectory_comparison.md
     ├── skill_audit.md
-    └── skill_patch.md
+    ├── skill_patch.md
+    ├── testing/        # EvalCase models, loader, structural scorers
+    └── test_suites/    # Built-in suites (strategy_generation, trajectory_comparison)
 ```
 
 ## Meta-Skills: The Bootstrap
 
-The four meta-skills in `meta_skills/` drive the evolution process itself. They can be evolved using the same pipeline — making the system self-improving:
+The four meta-skills in `meta_skills/` drive the evolution process itself. Two ship
+with built-in structural test suites (`test_suites/strategy_generation.jsonl`,
+`test_suites/trajectory_comparison.jsonl`) and have their own gated commands —
+plain `evolve` needs scorable tasks (see Task Format) and exits 2 without them:
 
 ```bash
-skill-evolution evolve src/skill_evolution/meta_skills/strategy_generation.md meta_skill_tasks.txt
+skill-evolution doctor
+skill-evolution meta-test --target strategy_generation --provider cli
+skill-evolution meta-evolve --target strategy_generation --provider cli --dry-run
 ```
 
 ## Citation
