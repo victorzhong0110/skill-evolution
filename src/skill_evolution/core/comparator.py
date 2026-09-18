@@ -18,11 +18,16 @@ from skill_evolution.runner.executor import TaskOutcome, Trajectory
 class DeltaSignal:
     """A single improvement signal extracted from trajectory comparison."""
 
-    category: str  # "missing_knowledge", "wrong_approach", "edge_case", "efficiency", "redundancy"
+    category: str  # one of VALID_CATEGORIES below
     description: str  # What the delta is
     evidence: str  # Concrete evidence from trajectories
     confidence: float  # 0-1, how confident we are this is a real signal
     affects: str  # "body" or "appendix" (EmbodiSkill-inspired targeting)
+
+
+# Keep in sync with TrajectoryComparisonScorer.VALID_CATEGORIES,
+# the trajectory_comparison meta-skill doc, and the meta-evolver prompt.
+VALID_CATEGORIES = {"missing_knowledge", "wrong_approach", "edge_case", "efficiency", "redundancy"}
 
 
 _FALLBACK_PROMPT = """\
@@ -202,7 +207,8 @@ Extract optimization signals."""
             for line in block.split("\n"):
                 stripped = line.strip()
                 if stripped.startswith("Category:"):
-                    category = stripped[len("Category:"):].strip().lower()
+                    raw_category = stripped[len("Category:"):].strip().lower()
+                    category = raw_category if raw_category in VALID_CATEGORIES else "missing_knowledge"
                 elif stripped.startswith("Affects:"):
                     affects = stripped[len("Affects:"):].strip().lower()
                 elif stripped.startswith("Confidence:"):

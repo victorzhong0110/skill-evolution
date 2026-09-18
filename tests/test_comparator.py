@@ -93,3 +93,32 @@ Evidence: only evidence no description
         comparator = Comparator.__new__(Comparator)
         signals = comparator._parse_signals(text)
         assert signals == []
+
+    def test_parse_unknown_category_defaults_to_missing_knowledge(self):
+        text = """\
+===SIGNAL 1===
+Category: totally_made_up
+Affects: body
+Confidence: 0.5
+Description: Something wrong
+Evidence: Saw it happen
+===END===
+"""
+        comparator = Comparator.__new__(Comparator)
+        signals = comparator._parse_signals(text)
+        assert len(signals) == 1
+        assert signals[0].category == "missing_knowledge"
+
+    def test_parse_redundancy_category_preserved(self):
+        text = """\
+===SIGNAL 1===
+Category: redundancy
+Affects: body
+Confidence: 0.7
+Description: Skill contains instance-specific content to delete
+Evidence: Changelog grew without DELETE
+===END===
+"""
+        comparator = Comparator.__new__(Comparator)
+        signals = comparator._parse_signals(text)
+        assert signals[0].category == "redundancy"
